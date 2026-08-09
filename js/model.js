@@ -15,6 +15,30 @@
 
   var LAYOUTS = ['1R', '1K', '1DK', '1LDK', '2K', '2DK', '2LDK', '3DK', '3LDK', '4LDK以上'];
 
+  // 横浜〜東京のあいだを走る路線（一本で行けるかどうかは問わない）。
+  // 探すエリアが変わったらこの配列を書き換えるだけで選択肢が入れ替わる。
+  var LINE_GROUPS = [
+    { company: 'JR', lines: [
+      'JR東海道線', 'JR横須賀線', 'JR京浜東北・根岸線', 'JR湘南新宿ライン',
+      'JR上野東京ライン', 'JR山手線', 'JR横浜線', 'JR南武線', 'JR鶴見線'
+    ] },
+    { company: '東急', lines: [
+      '東急東横線', '東急目黒線', '東急田園都市線', '東急大井町線',
+      '東急池上線', '東急多摩川線', '東急新横浜線'
+    ] },
+    { company: '京急', lines: ['京急本線', '京急大師線', '京急逗子線'] },
+    { company: '相鉄', lines: ['相鉄本線', '相鉄いずみ野線', '相鉄新横浜線'] },
+    { company: '横浜市営地下鉄', lines: ['ブルーライン', 'グリーンライン'] },
+    { company: 'その他', lines: [
+      'みなとみらい線', '東京メトロ日比谷線', '東京メトロ南北線', '都営三田線',
+      '東京モノレール', 'りんかい線', '小田急線', '東海道新幹線'
+    ] }
+  ];
+
+  var ALL_LINES = LINE_GROUPS.reduce(function (acc, g) {
+    return acc.concat(g.lines);
+  }, []);
+
   function statusLabel(key) {
     return (STATUS_BY_KEY[key] || STATUS_BY_KEY.interested).label;
   }
@@ -93,9 +117,21 @@
     return Math.round(months * p.rent) + (monthlyTotal(p) || 0);
   }
 
+  // 築年数は入力しやすさを優先して「◯年」で受け取るが、保存するのは築年（西暦）。
+  // 年数のまま保存すると年が変わるたびに値が古くなるため、時間が経っても狂わない西暦に直す。
   function buildingAge(p) {
     if (p.builtYear === null) return null;
     return new Date().getFullYear() - p.builtYear;
+  }
+
+  function ageToBuiltYear(age) {
+    if (age === null) return null;
+    return new Date().getFullYear() - age;
+  }
+
+  function builtYearToAge(year) {
+    if (year === null) return null;
+    return new Date().getFullYear() - year;
   }
 
   function formatYen(value) {
@@ -224,6 +260,8 @@
   Chintai.model = {
     STATUSES: STATUSES,
     LAYOUTS: LAYOUTS,
+    LINE_GROUPS: LINE_GROUPS,
+    ALL_LINES: ALL_LINES,
     SORTS: SORTS,
     DEFAULT_FILTER: DEFAULT_FILTER,
     statusLabel: statusLabel,
@@ -233,6 +271,8 @@
     monthlyTotal: monthlyTotal,
     initialCost: initialCost,
     buildingAge: buildingAge,
+    ageToBuiltYear: ageToBuiltYear,
+    builtYearToAge: builtYearToAge,
     formatYen: formatYen,
     formatMan: formatMan,
     ratingOf: ratingOf,

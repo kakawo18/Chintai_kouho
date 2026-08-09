@@ -9,6 +9,7 @@
   var rating = 0;
   var status = 'interested';
   var searchTimer = null;
+  var OTHER_LINE = '__other__';
 
   function $(id) { return document.getElementById(id); }
   function form() { return $('form'); }
@@ -21,6 +22,14 @@
       opt.value = l;
       $('layout-list').appendChild(opt);
     });
+
+    buildLineSelect();
+    // 自分で「その他」を選んだときだけ入力欄へ移動する（編集を開いた瞬間に飛ばさない）
+    $('line-select').addEventListener('change', function () {
+      syncLineOther();
+      if (!$('line-other').hidden) $('line-other').focus();
+    });
+    form().buildingAge.addEventListener('input', syncBuiltYearHint);
 
     var seg = $('status-seg');
     M.STATUSES.forEach(function (s) {
@@ -61,13 +70,16 @@
       $('form-delete').hidden = false;
       f.name.value = current.name;
       f.address.value = current.address;
-      ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'areaSqm', 'builtYear',
+      ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'areaSqm',
        'floor', 'walkMin', 'commuteMin'].forEach(function (k) {
         f[k].value = current[k] === null ? '' : String(current[k]);
       });
-      ['layout', 'line', 'station', 'commuteNote', 'url', 'memo'].forEach(function (k) {
+      ['layout', 'station', 'commuteNote', 'url', 'memo'].forEach(function (k) {
         f[k].value = current[k];
       });
+      var age = M.builtYearToAge(current.builtYear);
+      f.buildingAge.value = age === null ? '' : String(age);
+      setLine(current.line);
       f.imageUrls.value = current.imageUrls.join('\n');
       position = { lat: current.lat, lng: current.lng };
       status = current.status;
@@ -78,8 +90,10 @@
       position = { lat: null, lng: null };
       status = 'interested';
       rating = 0;
+      setLine('');
     }
 
+    syncBuiltYearHint();
     syncStatus();
     syncPosition();
     updateCostPreview();
@@ -96,6 +110,60 @@
   function close() {
     Chintai.ui.closePanel('form-panel');
     current = null;
+  }
+
+  // 路線は事業者ごとにまとめた選択式。載っていない路線のために「その他」で自由入力へ逃がす。
+  function buildLineSelect() {
+    var sel = $('line-select');
+    sel.innerHTML = '';
+
+    var blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '（未選択）';
+    sel.appendChild(blank);
+
+    M.LINE_GROUPS.forEach(function (group) {
+      var og = document.createElement('optgroup');
+      og.label = group.company;
+      group.lines.forEach(function (line) {
+        var opt = document.createElement('option');
+        opt.value = line;
+        opt.textContent = line;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+
+    var other = document.createElement('option');
+    other.value = OTHER_LINE;
+    other.textContent = 'その他（自由入力）';
+    sel.appendChild(other);
+  }
+
+  // 保存済みの路線が一覧にあれば選択、なければ「その他」に入れて元の文字列を残す
+  function setLine(value) {
+    var sel = $('line-select');
+    if (value && M.ALL_LINES.indexOf(value) === -1) {
+      sel.value = OTHER_LINE;
+      $('line-other').value = value;
+    } else {
+      sel.value = value || '';
+      $('line-other').value = '';
+    }
+    syncLineOther();
+  }
+
+  function syncLineOther() {
+    $('line-other').hidden = $('line-select').value !== OTHER_LINE;
+  }
+
+  // 入力された築年数が西暦の何年にあたるかをその場に出し、取り違えに気づけるようにする
+  function syncBuiltYearHint() {
+    var age = M.num(form().buildingAge.value);
+    var year = M.ageToBuiltYear(age);
+    var hint = $('built-year-hint');
+    hint.textContent = year === null ? '' : year + '年築';
+    hint.hidden = year === null;
   }
 
   function syncStatus() {
@@ -229,9 +297,11 @@
       keyMoneyMonths: M.num(f.keyMoneyMonths.value),
       layout: f.layout.value.trim(),
       areaSqm: M.num(f.areaSqm.value),
-      builtYear: M.num(f.builtYear.value),
+      builtYear: M.ageToBuiltYear(M.num(f.buildingAge.value)),
       floor: M.num(f.floor.value),
-      line: f.line.value.trim(),
+      line: $('line-select').value === OTHER_LINE
+        ? $('line-other').value.trim()
+        : $('line-select').value,
       station: f.station.value.trim(),
       walkMin: M.num(f.walkMin.value),
       commuteMin: M.num(f.commuteMin.value),
