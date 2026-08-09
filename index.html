@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6fd0">
+<title>賃貸候補メモ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div id="map" aria-label="物件の地図"></div>
+
+<!-- 位置ピッカーの十字。地図を動かして中央を目的の位置に合わせてもらう -->
+<div id="crosshair" class="crosshair" hidden aria-hidden="true">
+  <div class="crosshair__mark"></div>
+</div>
+
+<header class="topbar" id="topbar">
+  <input id="q" class="topbar__search" type="search" placeholder="物件名・住所・駅・メモを検索" aria-label="検索">
+  <button id="btn-filter" class="topbar__btn" type="button" aria-label="絞り込み">
+    <span class="topbar__btn-icon">⚙</span><span id="filter-badge" class="badge" hidden></span>
+  </button>
+  <button id="btn-menu" class="topbar__btn" type="button" aria-label="メニュー">⋮</button>
+</header>
+
+<div id="picker-bar" class="picker-bar" hidden>
+  <p class="picker-bar__text">地図を動かして、中央の十字を物件の位置に合わせてください</p>
+  <div class="picker-bar__actions">
+    <button id="picker-cancel" class="btn btn--ghost" type="button">やめる</button>
+    <button id="picker-confirm" class="btn btn--primary" type="button">この位置に決定</button>
+  </div>
+</div>
+
+<button id="btn-add" class="fab" type="button" aria-label="物件を追加">＋</button>
+
+<div id="status-toast" class="toast" hidden></div>
+
+<!-- ボトムシート：地図を背景に保ったまま一覧と詳細を出す -->
+<section id="sheet" class="sheet sheet--peek" aria-label="物件一覧">
+  <button id="sheet-handle" class="sheet__handle" type="button" aria-label="一覧を開閉">
+    <span class="sheet__grip"></span>
+  </button>
+
+  <div class="sheet__scroll" id="sheet-scroll">
+    <div id="list-view">
+      <div class="list-toolbar">
+        <span id="list-count" class="list-toolbar__count">0件</span>
+        <label class="list-toolbar__sort">
+          <span class="sr-only">並べ替え</span>
+          <select id="sort-select"></select>
+        </label>
+      </div>
+      <div id="list" class="list"></div>
+      <p id="list-empty" class="empty" hidden></p>
+    </div>
+
+    <div id="detail-view" hidden></div>
+  </div>
+</section>
+
+<!-- 物件の登録・編集 -->
+<div id="form-panel" class="panel" hidden>
+  <header class="panel__bar">
+    <button id="form-cancel" class="panel__back" type="button">閉じる</button>
+    <h2 id="form-title" class="panel__title">物件を追加</h2>
+    <button id="form-save" class="btn btn--primary btn--sm" type="button">保存</button>
+  </header>
+  <form id="form" class="panel__body" autocomplete="off">
+    <label class="field">
+      <span class="field__label">物件名 <em class="req">必須</em></span>
+      <input name="name" type="text" required placeholder="○○マンション 302号室">
+    </label>
+
+    <fieldset class="field field--group">
+      <legend class="field__label">場所 <em class="req">必須</em></legend>
+      <input id="address-input" name="address" type="text" placeholder="住所を入力すると候補が出ます">
+      <ul id="address-results" class="suggest" hidden></ul>
+      <p id="geo-status" class="hint" hidden></p>
+      <div class="row">
+        <button id="btn-pick-on-map" class="btn btn--ghost btn--sm" type="button">地図で位置を指定</button>
+        <span id="latlng-view" class="hint hint--inline">未設定</span>
+      </div>
+    </fieldset>
+
+    <div class="grid2">
+      <label class="field">
+        <span class="field__label">家賃（円/月）</span>
+        <input name="rent" type="text" inputmode="numeric" placeholder="85000">
+      </label>
+      <label class="field">
+        <span class="field__label">管理費（円/月）</span>
+        <input name="adminFee" type="text" inputmode="numeric" placeholder="5000">
+      </label>
+      <label class="field">
+        <span class="field__label">敷金（ヶ月）</span>
+        <input name="depositMonths" type="text" inputmode="decimal" placeholder="1">
+      </label>
+      <label class="field">
+        <span class="field__label">礼金（ヶ月）</span>
+        <input name="keyMoneyMonths" type="text" inputmode="decimal" placeholder="1">
+      </label>
+    </div>
+    <p id="cost-preview" class="cost-preview">実質月額 — ／ 初期費用の目安 —</p>
+
+    <div class="grid2">
+      <label class="field">
+        <span class="field__label">間取り</span>
+        <input name="layout" type="text" list="layout-list" placeholder="1LDK">
+        <datalist id="layout-list"></datalist>
+      </label>
+      <label class="field">
+        <span class="field__label">面積（㎡）</span>
+        <input name="areaSqm" type="text" inputmode="decimal" placeholder="45">
+      </label>
+      <label class="field">
+        <span class="field__label">築年（西暦）</span>
+        <input name="builtYear" type="text" inputmode="numeric" placeholder="2012">
+      </label>
+      <label class="field">
+        <span class="field__label">階</span>
+        <input name="floor" type="text" inputmode="numeric" placeholder="3">
+      </label>
+      <label class="field">
+        <span class="field__label">路線</span>
+        <input name="line" type="text" placeholder="JR中央線">
+      </label>
+      <label class="field">
+        <span class="field__label">最寄駅</span>
+        <input name="station" type="text" placeholder="中野">
+      </label>
+      <label class="field">
+        <span class="field__label">駅から徒歩（分）</span>
+        <input name="walkMin" type="text" inputmode="numeric" placeholder="8">
+      </label>
+      <label class="field">
+        <span class="field__label">通勤時間（分）</span>
+        <input name="commuteMin" type="text" inputmode="numeric" placeholder="35">
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field__label">通勤メモ</span>
+      <input name="commuteNote" type="text" placeholder="乗換1回 / 座れない">
+    </label>
+
+    <label class="field">
+      <span class="field__label">物件ページ URL</span>
+      <input name="url" type="url" inputmode="url" placeholder="https://suumo.jp/...">
+    </label>
+
+    <label class="field">
+      <span class="field__label">画像 URL（1行に1つ）</span>
+      <textarea name="imageUrls" rows="2" placeholder="https://.../room.jpg"></textarea>
+      <span class="hint">物件サイトの画像は表示できないことがあります</span>
+    </label>
+
+    <label class="field">
+      <span class="field__label">メモ</span>
+      <textarea name="memo" rows="3" placeholder="日当たり良好。キッチン狭め。"></textarea>
+    </label>
+
+    <div class="field">
+      <span class="field__label">検討ステータス</span>
+      <div id="status-seg" class="seg" role="group"></div>
+    </div>
+
+    <div class="field">
+      <span class="field__label">自分の評価</span>
+      <div id="form-rating" class="stars stars--input" role="group"></div>
+    </div>
+
+    <button id="form-delete" class="btn btn--danger btn--block" type="button" hidden>この物件を削除</button>
+  </form>
+</div>
+
+<!-- 絞り込み -->
+<div id="filter-panel" class="panel" hidden>
+  <header class="panel__bar">
+    <button id="filter-close" class="panel__back" type="button">閉じる</button>
+    <h2 class="panel__title">絞り込み</h2>
+    <button id="filter-reset" class="btn btn--ghost btn--sm" type="button">リセット</button>
+  </header>
+  <div class="panel__body">
+    <label class="field">
+      <span class="field__label">実質月額の上限（円）</span>
+      <input id="f-max-rent" type="text" inputmode="numeric" placeholder="100000">
+    </label>
+    <div class="field">
+      <span class="field__label">間取り</span>
+      <div id="f-layouts" class="chips"></div>
+    </div>
+    <div class="field">
+      <span class="field__label">ステータス</span>
+      <div id="f-statuses" class="chips"></div>
+    </div>
+    <div class="field">
+      <span class="field__label">★の下限</span>
+      <div id="f-rating" class="chips"></div>
+      <div id="f-rating-who" class="chips chips--sub"></div>
+    </div>
+  </div>
+</div>
+
+<!-- メニュー -->
+<div id="menu-panel" class="panel panel--sheet" hidden>
+  <header class="panel__bar">
+    <button id="menu-close" class="panel__back" type="button">閉じる</button>
+    <h2 class="panel__title">メニュー</h2>
+    <span class="panel__spacer"></span>
+  </header>
+  <div class="panel__body">
+    <div class="menu-block">
+      <p class="menu-block__title">同居人と共有</p>
+      <p class="menu-block__desc">この URL を送ると、相手も同じリストを編集できます。</p>
+      <input id="share-url" class="share-url" type="text" readonly>
+      <div class="row">
+        <button id="btn-copy" class="btn btn--primary btn--sm" type="button">URLをコピー</button>
+        <button id="btn-share" class="btn btn--ghost btn--sm" type="button" hidden>送る</button>
+      </div>
+    </div>
+
+    <div class="menu-block">
+      <p class="menu-block__title">表示名</p>
+      <div class="row">
+        <input id="nickname-input" type="text" placeholder="あなたの名前" maxlength="20">
+        <button id="btn-save-nickname" class="btn btn--ghost btn--sm" type="button">保存</button>
+      </div>
+      <p id="members-view" class="hint"></p>
+    </div>
+
+    <div class="menu-block">
+      <p class="menu-block__title">バックアップ</p>
+      <div class="row">
+        <button id="btn-export" class="btn btn--ghost btn--sm" type="button">JSONで書き出し</button>
+        <button id="btn-import" class="btn btn--ghost btn--sm" type="button">読み込み</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 初回のみ表示する名前の登録 -->
+<div id="welcome-panel" class="panel panel--center" hidden>
+  <div class="welcome">
+    <h1 class="welcome__title">賃貸候補メモ</h1>
+    <p id="welcome-desc" class="welcome__desc">地図に候補をためて、同居人と一緒に選びます。</p>
+    <label class="field">
+      <span class="field__label">表示名（同居人に見えます）</span>
+      <input id="welcome-nickname" type="text" placeholder="例：たろう" maxlength="20">
+    </label>
+    <button id="welcome-start" class="btn btn--primary btn--block" type="button">はじめる</button>
+  </div>
+</div>
+
+<div id="boot-error" class="panel panel--center" hidden>
+  <div class="welcome">
+    <h1 class="welcome__title">接続できませんでした</h1>
+    <p id="boot-error-msg" class="welcome__desc"></p>
+  </div>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/firebase/firebase-app-compat.js"></script>
+<script src="vendor/firebase/firebase-auth-compat.js"></script>
+<script src="vendor/firebase/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/model.js"></script>
+<script src="js/session.js"></script>
+<script src="js/db.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/form.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
