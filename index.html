@@ -71,6 +71,16 @@
     <button id="form-save" class="btn btn--primary btn--sm" type="button">保存</button>
   </header>
   <form id="form" class="panel__body" autocomplete="off">
+    <div id="autofill" class="autofill" hidden>
+      <p class="autofill__title">URL か物件情報から自動入力</p>
+      <textarea id="autofill-input" rows="2"
+        placeholder="物件ページの URL を貼る（取得できない場合はページの文字を貼る）"></textarea>
+      <div class="row">
+        <button id="autofill-run" class="btn btn--primary btn--sm" type="button">読み取る</button>
+        <span id="autofill-status" class="hint hint--inline"></span>
+      </div>
+    </div>
+
     <label class="field">
       <span class="field__label">物件名 <em class="req">必須</em></span>
       <input name="name" type="text" required placeholder="○○マンション 302号室">
@@ -118,8 +128,9 @@
         <input name="areaSqm" type="text" inputmode="decimal" placeholder="45">
       </label>
       <label class="field">
-        <span class="field__label">築年（西暦）</span>
-        <input name="builtYear" type="text" inputmode="numeric" placeholder="2012">
+        <span class="field__label">築年数（年）</span>
+        <input name="buildingAge" type="text" inputmode="numeric" placeholder="12">
+        <span id="built-year-hint" class="hint"></span>
       </label>
       <label class="field">
         <span class="field__label">階</span>
@@ -127,7 +138,8 @@
       </label>
       <label class="field">
         <span class="field__label">路線</span>
-        <input name="line" type="text" placeholder="JR中央線">
+        <select id="line-select"></select>
+        <input id="line-other" name="line" type="text" placeholder="路線名を入力" hidden>
       </label>
       <label class="field">
         <span class="field__label">最寄駅</span>
@@ -234,6 +246,27 @@
     </div>
 
     <div class="menu-block">
+      <p class="menu-block__title">自動入力</p>
+      <p class="menu-block__desc">
+        物件ページの URL から項目を読み取ります。中継サーバーを立てた人から
+        アドレスと合言葉を聞いて入れてください。この2つは端末内にだけ保存されます。
+      </p>
+      <label class="field">
+        <span class="field__label">中継サーバーのアドレス</span>
+        <input id="extract-endpoint" type="url" inputmode="url"
+          placeholder="https://....workers.dev">
+      </label>
+      <label class="field">
+        <span class="field__label">合言葉</span>
+        <input id="extract-passphrase" type="password" placeholder="合言葉">
+      </label>
+      <div class="row">
+        <button id="btn-save-extract" class="btn btn--ghost btn--sm" type="button">保存</button>
+        <span id="extract-state" class="hint hint--inline"></span>
+      </div>
+    </div>
+
+    <div class="menu-block">
       <p class="menu-block__title">バックアップ</p>
       <div class="row">
         <button id="btn-export" class="btn btn--ghost btn--sm" type="button">JSONで書き出し</button>
@@ -273,6 +306,7 @@
 <script src="js/session.js"></script>
 <script src="js/db.js"></script>
 <script src="js/geo.js"></script>
+<script src="js/extract.js"></script>
 <script src="js/map.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/form.js"></script>

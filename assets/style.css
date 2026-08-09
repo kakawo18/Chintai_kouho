@@ -288,7 +288,7 @@ body.is-picking .topbar { display: none; }
 
 .field { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
 .field__label { font-size: 12.5px; color: var(--muted); }
-.field input, .field textarea, .share-url {
+.field input, .field textarea, .field select, .share-url {
   width: 100%; padding: 10px 12px;
   border: 1px solid var(--line); border-radius: 10px; background: #fff;
 }
@@ -301,6 +301,16 @@ body.is-picking .topbar { display: none; }
 .cost-preview {
   margin: 0; padding: 10px 12px;
   background: #f5f7fa; border-radius: 10px; font-size: 13px;
+}
+
+.autofill {
+  padding: 12px; border: 1px dashed var(--accent); border-radius: 10px;
+  background: #f5f8fd; display: flex; flex-direction: column; gap: 8px;
+}
+.autofill__title { margin: 0; font-size: 13px; font-weight: 700; color: var(--accent); }
+.autofill textarea {
+  width: 100%; padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
 }
 
 .suggest {

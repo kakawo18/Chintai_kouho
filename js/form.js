@@ -9,6 +9,7 @@
   var rating = 0;
   var status = 'interested';
   var searchTimer = null;
+  var OTHER_LINE = '__other__';
 
   function $(id) { return document.getElementById(id); }
   function form() { return $('form'); }
@@ -21,6 +22,14 @@
       opt.value = l;
       $('layout-list').appendChild(opt);
     });
+
+    buildLineSelect();
+    // 自分で「その他」を選んだときだけ入力欄へ移動する（編集を開いた瞬間に飛ばさない）
+    $('line-select').addEventListener('change', function () {
+      syncLineOther();
+      if (!$('line-other').hidden) $('line-other').focus();
+    });
+    form().buildingAge.addEventListener('input', syncBuiltYearHint);
 
     var seg = $('status-seg');
     M.STATUSES.forEach(function (s) {
@@ -43,6 +52,7 @@
     $('picker-confirm').addEventListener('click', confirmPicking);
 
     $('address-input').addEventListener('input', onAddressInput);
+    $('autofill-run').addEventListener('click', runAutofill);
 
     ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths'].forEach(function (name) {
       form()[name].addEventListener('input', updateCostPreview);
@@ -56,18 +66,26 @@
     $('address-results').hidden = true;
     $('geo-status').hidden = true;
 
+    // 自動入力は中継サーバーを設定した人にだけ出す
+    $('autofill').hidden = !Chintai.extract.isConfigured();
+    $('autofill-input').value = '';
+    setAutofillStatus('');
+
     if (current) {
       $('form-title').textContent = '物件を編集';
       $('form-delete').hidden = false;
       f.name.value = current.name;
       f.address.value = current.address;
-      ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'areaSqm', 'builtYear',
+      ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'areaSqm',
        'floor', 'walkMin', 'commuteMin'].forEach(function (k) {
         f[k].value = current[k] === null ? '' : String(current[k]);
       });
-      ['layout', 'line', 'station', 'commuteNote', 'url', 'memo'].forEach(function (k) {
+      ['layout', 'station', 'commuteNote', 'url', 'memo'].forEach(function (k) {
         f[k].value = current[k];
       });
+      var age = M.builtYearToAge(current.builtYear);
+      f.buildingAge.value = age === null ? '' : String(age);
+      setLine(current.line);
       f.imageUrls.value = current.imageUrls.join('\n');
       position = { lat: current.lat, lng: current.lng };
       status = current.status;
@@ -78,8 +96,10 @@
       position = { lat: null, lng: null };
       status = 'interested';
       rating = 0;
+      setLine('');
     }
 
+    syncBuiltYearHint();
     syncStatus();
     syncPosition();
     updateCostPreview();
@@ -96,6 +116,60 @@
   function close() {
     Chintai.ui.closePanel('form-panel');
     current = null;
+  }
+
+  // 路線は事業者ごとにまとめた選択式。載っていない路線のために「その他」で自由入力へ逃がす。
+  function buildLineSelect() {
+    var sel = $('line-select');
+    sel.innerHTML = '';
+
+    var blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '（未選択）';
+    sel.appendChild(blank);
+
+    M.LINE_GROUPS.forEach(function (group) {
+      var og = document.createElement('optgroup');
+      og.label = group.company;
+      group.lines.forEach(function (line) {
+        var opt = document.createElement('option');
+        opt.value = line;
+        opt.textContent = line;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+
+    var other = document.createElement('option');
+    other.value = OTHER_LINE;
+    other.textContent = 'その他（自由入力）';
+    sel.appendChild(other);
+  }
+
+  // 保存済みの路線が一覧にあれば選択、なければ「その他」に入れて元の文字列を残す
+  function setLine(value) {
+    var sel = $('line-select');
+    if (value && M.ALL_LINES.indexOf(value) === -1) {
+      sel.value = OTHER_LINE;
+      $('line-other').value = value;
+    } else {
+      sel.value = value || '';
+      $('line-other').value = '';
+    }
+    syncLineOther();
+  }
+
+  function syncLineOther() {
+    $('line-other').hidden = $('line-select').value !== OTHER_LINE;
+  }
+
+  // 入力された築年数が西暦の何年にあたるかをその場に出し、取り違えに気づけるようにする
+  function syncBuiltYearHint() {
+    var age = M.num(form().buildingAge.value);
+    var year = M.ageToBuiltYear(age);
+    var hint = $('built-year-hint');
+    hint.textContent = year === null ? '' : year + '年築';
+    hint.hidden = year === null;
   }
 
   function syncStatus() {
@@ -127,6 +201,92 @@
     $('cost-preview').textContent =
       '実質月額 ' + (total === null ? '—' : M.formatYen(total)) +
       ' ／ 初期費用の目安 ' + (initial === null ? '—' : M.formatYen(initial));
+  }
+
+  /* ---------- 自動入力 ---------- */
+
+  // 読み取った値はフォームに入れるだけで保存はしない。必ず目で見て直せるようにする。
+  function runAutofill() {
+    var input = $('autofill-input').value;
+    if (!input.trim()) {
+      setAutofillStatus('URL か物件情報を貼ってください');
+      return;
+    }
+
+    var button = $('autofill-run');
+    button.disabled = true;
+    setAutofillStatus('読み取っています…');
+
+    Chintai.extract.run(input).then(function (data) {
+      var filled = applyExtracted(data);
+      setAutofillStatus(filled.length
+        ? filled.length + '項目を入れました（' + filled.join('、') + '）。内容を確認してください'
+        : '読み取れる項目がありませんでした');
+    }).catch(function (err) {
+      setAutofillStatus(err.message);
+    }).then(function () {
+      button.disabled = false;
+    });
+  }
+
+  function setAutofillStatus(text) {
+    $('autofill-status').textContent = text;
+  }
+
+  var AUTOFILL_LABELS = {
+    name: '物件名', address: '住所', rent: '家賃', adminFee: '管理費',
+    depositMonths: '敷金', keyMoneyMonths: '礼金', layout: '間取り',
+    areaSqm: '面積', builtYear: '築年数', floor: '階', line: '路線',
+    station: '最寄駅', walkMin: '徒歩分', imageUrls: '画像', memo: 'メモ', url: '物件URL'
+  };
+
+  // 空欄だけを埋める。手で書いた内容を上書きしない。
+  function applyExtracted(data) {
+    var f = form();
+    var filled = [];
+
+    ['name', 'address', 'layout', 'station', 'url', 'memo'].forEach(function (k) {
+      if (data[k] && !f[k].value.trim()) {
+        f[k].value = data[k];
+        filled.push(AUTOFILL_LABELS[k]);
+      }
+    });
+
+    ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'areaSqm', 'floor', 'walkMin']
+      .forEach(function (k) {
+        if (data[k] !== null && !f[k].value.trim()) {
+          f[k].value = String(data[k]);
+          filled.push(AUTOFILL_LABELS[k]);
+        }
+      });
+
+    if (data.builtYear !== null && !f.buildingAge.value.trim()) {
+      f.buildingAge.value = String(M.builtYearToAge(data.builtYear));
+      filled.push(AUTOFILL_LABELS.builtYear);
+    }
+
+    if (data.line && !currentLineValue()) {
+      setLine(data.line);
+      filled.push(AUTOFILL_LABELS.line);
+    }
+
+    if (data.imageUrls.length && !f.imageUrls.value.trim()) {
+      f.imageUrls.value = data.imageUrls.join('\n');
+      filled.push(AUTOFILL_LABELS.imageUrls);
+    }
+
+    updateCostPreview();
+    syncBuiltYearHint();
+
+    // 住所が入ったら地図の位置も自動で取りにいく（失敗しても入力は残る）
+    if (data.address && position.lat === null) runSearch(data.address);
+
+    return filled;
+  }
+
+  function currentLineValue() {
+    var sel = $('line-select');
+    return sel.value === OTHER_LINE ? $('line-other').value.trim() : sel.value;
   }
 
   /* ---------- 住所検索 ---------- */
@@ -229,9 +389,11 @@
       keyMoneyMonths: M.num(f.keyMoneyMonths.value),
       layout: f.layout.value.trim(),
       areaSqm: M.num(f.areaSqm.value),
-      builtYear: M.num(f.builtYear.value),
+      builtYear: M.ageToBuiltYear(M.num(f.buildingAge.value)),
       floor: M.num(f.floor.value),
-      line: f.line.value.trim(),
+      line: $('line-select').value === OTHER_LINE
+        ? $('line-other').value.trim()
+        : $('line-select').value,
       station: f.station.value.trim(),
       walkMin: M.num(f.walkMin.value),
       commuteMin: M.num(f.commuteMin.value),

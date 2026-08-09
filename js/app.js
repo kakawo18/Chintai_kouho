@@ -203,6 +203,7 @@
       $('share-url').value = Chintai.session.shareUrl(roomId);
       $('nickname-input').value = Chintai.session.getNickname();
       renderMembers();
+      renderExtractState();
       ui.openPanel('menu-panel');
     });
     $('menu-close').addEventListener('click', function () { ui.closePanel('menu-panel'); });
@@ -241,12 +242,31 @@
       Chintai.db.setNickname(name).then(function () { ui.toast('表示名を保存しました'); });
     });
 
+    $('btn-save-extract').addEventListener('click', function () {
+      Chintai.session.setExtractConfig({
+        endpoint: $('extract-endpoint').value.trim(),
+        passphrase: $('extract-passphrase').value
+      });
+      renderExtractState();
+      ui.toast('自動入力の設定を保存しました');
+    });
+
     $('btn-export').addEventListener('click', exportJson);
     $('btn-import').addEventListener('click', function () { $('import-file').click(); });
     $('import-file').addEventListener('change', function () {
       if (this.files && this.files[0]) importJson(this.files[0]);
       this.value = '';
     });
+  }
+
+  // 合言葉そのものは画面に出さず、設定済みかどうかだけ示す
+  function renderExtractState() {
+    var conf = Chintai.session.getExtractConfig();
+    $('extract-endpoint').value = conf.endpoint || '';
+    $('extract-passphrase').value = conf.passphrase || '';
+    $('extract-state').textContent = (conf.endpoint && conf.passphrase)
+      ? '設定済み。物件の追加画面で使えます'
+      : '未設定（手入力のみ）';
   }
 
   function renderMembers() {

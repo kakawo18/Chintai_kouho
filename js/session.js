@@ -6,6 +6,7 @@
   var ROOM_KEY = 'chintai_room_id';
   var NICK_KEY = 'chintai_nickname';
   var VIEW_KEY = 'chintai_view_state';
+  var EXTRACT_KEY = 'chintai_extract_config';
 
   function safeGet(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -79,7 +80,22 @@
     safeSet(VIEW_KEY, JSON.stringify(state));
   }
 
+  // 自動入力の接続先と合言葉。端末内にだけ置き、共有データには載せない。
+  function getExtractConfig() {
+    try {
+      return JSON.parse(safeGet(EXTRACT_KEY) || '{}');
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setExtractConfig(config) {
+    safeSet(EXTRACT_KEY, JSON.stringify(config));
+  }
+
   Chintai.session = {
+    getExtractConfig: getExtractConfig,
+    setExtractConfig: setExtractConfig,
     resolveRoomId: resolveRoomId,
     newRoomId: newRoomId,
     shareUrl: shareUrl,
