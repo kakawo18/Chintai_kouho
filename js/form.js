@@ -52,6 +52,7 @@
     $('picker-confirm').addEventListener('click', confirmPicking);
 
     $('address-input').addEventListener('input', onAddressInput);
+    $('autofill-run').addEventListener('click', runAutofill);
 
     ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths'].forEach(function (name) {
       form()[name].addEventListener('input', updateCostPreview);
@@ -64,6 +65,11 @@
     f.reset();
     $('address-results').hidden = true;
     $('geo-status').hidden = true;
+
+    // 自動入力は中継サーバーを設定した人にだけ出す
+    $('autofill').hidden = !Chintai.extract.isConfigured();
+    $('autofill-input').value = '';
+    setAutofillStatus('');
 
     if (current) {
       $('form-title').textContent = '物件を編集';
@@ -195,6 +201,92 @@
     $('cost-preview').textContent =
       '実質月額 ' + (total === null ? '—' : M.formatYen(total)) +
       ' ／ 初期費用の目安 ' + (initial === null ? '—' : M.formatYen(initial));
+  }
+
+  /* ---------- 自動入力 ---------- */
+
+  // 読み取った値はフォームに入れるだけで保存はしない。必ず目で見て直せるようにする。
+  function runAutofill() {
+    var input = $('autofill-input').value;
+    if (!input.trim()) {
+      setAutofillStatus('URL か物件情報を貼ってください');
+      return;
+    }
+
+    var button = $('autofill-run');
+    button.disabled = true;
+    setAutofillStatus('読み取っています…');
+
+    Chintai.extract.run(input).then(function (data) {
+      var filled = applyExtracted(data);
+      setAutofillStatus(filled.length
+        ? filled.length + '項目を入れました（' + filled.join('、') + '）。内容を確認してください'
+        : '読み取れる項目がありませんでした');
+    }).catch(function (err) {
+      setAutofillStatus(err.message);
+    }).then(function () {
+      button.disabled = false;
+    });
+  }
+
+  function setAutofillStatus(text) {
+    $('autofill-status').textContent = text;
+  }
+
+  var AUTOFILL_LABELS = {
+    name: '物件名', address: '住所', rent: '家賃', adminFee: '管理費',
+    depositMonths: '敷金', keyMoneyMonths: '礼金', layout: '間取り',
+    areaSqm: '面積', builtYear: '築年数', floor: '階', line: '路線',
+    station: '最寄駅', walkMin: '徒歩分', imageUrls: '画像', memo: 'メモ', url: '物件URL'
+  };
+
+  // 空欄だけを埋める。手で書いた内容を上書きしない。
+  function applyExtracted(data) {
+    var f = form();
+    var filled = [];
+
+    ['name', 'address', 'layout', 'station', 'url', 'memo'].forEach(function (k) {
+      if (data[k] && !f[k].value.trim()) {
+        f[k].value = data[k];
+        filled.push(AUTOFILL_LABELS[k]);
+      }
+    });
+
+    ['rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'areaSqm', 'floor', 'walkMin']
+      .forEach(function (k) {
+        if (data[k] !== null && !f[k].value.trim()) {
+          f[k].value = String(data[k]);
+          filled.push(AUTOFILL_LABELS[k]);
+        }
+      });
+
+    if (data.builtYear !== null && !f.buildingAge.value.trim()) {
+      f.buildingAge.value = String(M.builtYearToAge(data.builtYear));
+      filled.push(AUTOFILL_LABELS.builtYear);
+    }
+
+    if (data.line && !currentLineValue()) {
+      setLine(data.line);
+      filled.push(AUTOFILL_LABELS.line);
+    }
+
+    if (data.imageUrls.length && !f.imageUrls.value.trim()) {
+      f.imageUrls.value = data.imageUrls.join('\n');
+      filled.push(AUTOFILL_LABELS.imageUrls);
+    }
+
+    updateCostPreview();
+    syncBuiltYearHint();
+
+    // 住所が入ったら地図の位置も自動で取りにいく（失敗しても入力は残る）
+    if (data.address && position.lat === null) runSearch(data.address);
+
+    return filled;
+  }
+
+  function currentLineValue() {
+    var sel = $('line-select');
+    return sel.value === OTHER_LINE ? $('line-other').value.trim() : sel.value;
   }
 
   /* ---------- 住所検索 ---------- */

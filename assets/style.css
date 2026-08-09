@@ -303,6 +303,16 @@ body.is-picking .topbar { display: none; }
   background: #f5f7fa; border-radius: 10px; font-size: 13px;
 }
 
+.autofill {
+  padding: 12px; border: 1px dashed var(--accent); border-radius: 10px;
+  background: #f5f8fd; display: flex; flex-direction: column; gap: 8px;
+}
+.autofill__title { margin: 0; font-size: 13px; font-weight: 700; color: var(--accent); }
+.autofill textarea {
+  width: 100%; padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
+}
+
 .suggest {
   list-style: none; margin: 0; padding: 0;
   border: 1px solid var(--line); border-radius: 10px; overflow: hidden;

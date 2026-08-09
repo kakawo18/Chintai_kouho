@@ -26,6 +26,7 @@ var SHELL = [
   './js/session.js',
   './js/db.js',
   './js/geo.js',
+  './js/extract.js',
   './js/map.js',
   './js/ui.js',
   './js/form.js',
