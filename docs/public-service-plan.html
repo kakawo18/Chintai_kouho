@@ -1,0 +1,1472 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>物件メモ — 公開サービス化の計画</title>
+
+<style>
+  :root {
+    --paper: #f5f7f9;
+    --surface: #ffffff;
+    --ink: #15202b;
+    --ink-soft: #55677a;
+    --rule: #dde3ea;
+    --rule-soft: #eaeff4;
+    --accent: #2f6fd0;
+    --accent-soft: #e8f0fc;
+    --block: #ab3b2a;
+    --block-soft: #fae9e5;
+    --done: #27714d;
+    --done-soft: #e4f0ea;
+
+    --display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", "Songti SC", serif;
+    --body: "Hiragino Kaku Gothic ProN", "Yu Gothic", YuGothic, "Noto Sans JP", system-ui, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --measure: 44rem;
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #10151b;
+      --surface: #171f27;
+      --ink: #e5ebf2;
+      --ink-soft: #94a4b5;
+      --rule: #28323d;
+      --rule-soft: #1e2731;
+      --accent: #7aa9ea;
+      --accent-soft: #1a2635;
+      --block: #e28a77;
+      --block-soft: #2b1f1c;
+      --done: #5eb48e;
+      --done-soft: #16261e;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #10151b;
+    --surface: #171f27;
+    --ink: #e5ebf2;
+    --ink-soft: #94a4b5;
+    --rule: #28323d;
+    --rule-soft: #1e2731;
+    --accent: #7aa9ea;
+    --accent-soft: #1a2635;
+    --block: #e28a77;
+    --block-soft: #2b1f1c;
+    --done: #5eb48e;
+    --done-soft: #16261e;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: clamp(2rem, 6vw, 4.5rem) clamp(1.15rem, 5vw, 2rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  /* ---------- 見出し ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 0.85rem; }
+
+  .masthead__eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .masthead__title {
+    font-family: var(--display);
+    font-size: clamp(1.9rem, 6vw, 2.9rem);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .masthead__lead {
+    margin: 0;
+    font-size: 1.02rem;
+    color: var(--ink-soft);
+    max-width: 34rem;
+  }
+
+  .masthead__meta {
+    margin-top: 0.4rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(1.25rem, 3.6vw, 1.6rem);
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--ink);
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--body);
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+
+  p { margin: 0; }
+  p + p { margin-top: 0.9rem; }
+
+  a {
+    color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 700; }
+
+  .mono-inline {
+    font-family: var(--mono);
+    font-size: 0.88em;
+  }
+
+  /* ---------- 注記ブロック ---------- */
+
+  .note {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .note--warn { border-left-color: var(--block); }
+
+  .note__label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- 現在地の一覧 ---------- */
+
+  .status {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .status__row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0.5rem 1rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    align-items: start;
+  }
+
+  .status__mark {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    text-align: center;
+    background: var(--done-soft);
+    color: var(--done);
+    white-space: nowrap;
+  }
+
+  .status__mark--gap {
+    background: var(--block-soft);
+    color: var(--block);
+  }
+
+  /* ---------- 壁の一覧 ---------- */
+
+  .gap-group { display: flex; flex-direction: column; gap: 1rem; }
+
+  .gap-group__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+  }
+
+  .gap-group__title {
+    font-family: var(--display);
+    font-size: 1.08rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .gap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .gap__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex: none;
+  }
+
+  .badge--must { color: var(--block); background: var(--block-soft); }
+  .badge--before { color: var(--accent); background: var(--accent-soft); }
+  .badge--later { color: var(--ink-soft); background: var(--rule-soft); }
+  .badge--pick { color: var(--done); background: var(--done-soft); }
+  .badge--solved { color: var(--done); background: var(--done-soft); }
+
+  .gap__line {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 0.75rem;
+    font-size: 0.94rem;
+  }
+
+  .gap__key {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    padding-top: 0.35em;
+    letter-spacing: 0.04em;
+  }
+
+  /* ---------- 段階 ---------- */
+
+  .phases {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .phase {
+    display: grid;
+    grid-template-columns: 3.25rem 1fr;
+    gap: 0 1.1rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .phase:last-child { border-bottom: 1px solid var(--rule); }
+
+  .phase__num {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 0.35em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .phase__body { display: flex; flex-direction: column; gap: 0.7rem; }
+
+  .phase__goal {
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+
+  ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  li { padding-left: 0.15rem; }
+  li::marker { color: var(--ink-soft); }
+
+  /* ---------- 費用表 ---------- */
+
+  .scroller { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 30rem;
+    font-size: 0.9rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+
+  td.num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  tr.is-pick { background: var(--done-soft); }
+  tr.is-pick td:first-child { font-weight: 700; }
+  tr.is-now td:first-child { color: var(--ink-soft); }
+
+  td .yes { color: var(--done); font-weight: 700; }
+  td .no { color: var(--block); font-weight: 700; }
+
+  .pick-note {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-left: 3px solid var(--done);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 1rem 1.15rem;
+  }
+
+  .pick-note__label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--done);
+  }
+
+  /* ---------- 決定事項 ---------- */
+
+  .decisions { display: flex; flex-direction: column; gap: 1rem; }
+
+  .decision {
+    border-left: 3px solid var(--block);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .decision__q {
+    font-weight: 700;
+    font-size: 0.98rem;
+  }
+
+  .decision__why {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  @media (max-width: 30rem) {
+    .status__row { grid-template-columns: 1fr; gap: 0.3rem; }
+    .status__mark { justify-self: start; }
+    .gap__line { grid-template-columns: 1fr; gap: 0.15rem; }
+    .gap__key { padding-top: 0; }
+    .phase { grid-template-columns: 1fr; gap: 0.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <div class="masthead__eyebrow">計画 / 実装なし / 第2版</div>
+    <h1 class="masthead__title">物件メモを、誰でも使えるサービスにするために</h1>
+    <p class="masthead__lead">
+      いまの物件メモは「知り合い数人で使う道具」として成立しています。見知らぬ人が使う
+      サービスにするには、その前提の上に立っている部分を置き換える必要があります。
+      この文書は、何を置き換えるのか、その代わりに何を使うのか、どの順で進めるのか、
+      そして先に決めなければ着手できないことを整理したものです。
+    </p>
+    <div class="masthead__meta">
+      <span>2026-08-10</span>
+      <span>対象：kakawo18/Chintai_kouho</span>
+      <span>コードは含みません</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>ワリカを目標に置くと、何が変わるか</h2>
+    <p>
+      前の版では「登録すれば誰でも使えるサービス」を目標に置いていました。
+      ワリカ（<span class="mono-inline">walica.jp</span>）を調べたところ、<strong>その前提が違っていました。</strong>
+      目標が具体的になったことで、やるべきことは前の版より<strong>減っています</strong>。
+    </p>
+
+    <div class="note">
+      <div class="note__label">ワリカの作り</div>
+      <ul>
+        <li><strong>会員登録もインストールも要りません。</strong>開いてすぐ使えます</li>
+        <li>グループの共有は<strong>リンクと QR コード</strong>で行います</li>
+        <li>立て替えを入れると精算額を計算する、という一点に絞られています</li>
+        <li>無料で提供されています</li>
+      </ul>
+      <p>
+        つまりワリカは「アカウントを作らせるサービス」ではなく、
+        <strong>URL がそのままグループの入り口になっているサービス</strong>です。
+        これは、いまの物件メモがすでに採っている作りとほぼ同じです。
+      </p>
+    </div>
+
+    <div class="pick-note">
+      <div class="pick-note__label">計画への影響</div>
+      <p>
+        <strong>ログインの追加は、公開の必須条件から外せます。</strong>前の版では
+        「アカウントがないこと」を最大の課題として段階2に置いていましたが、
+        目標がワリカなら、いまの匿名＋共有URLのままで筋が通ります。
+      </p>
+      <p>
+        ただし1つだけ、ワリカとの性質の違いが残ります。ワリカが扱うのは
+        <strong>飲み会や旅行という数日で終わる記録</strong>ですが、物件メモが扱うのは
+        <strong>数週間から数か月にわたって育てる記録</strong>です。この間に履歴を消したり
+        機種変更したりすると、いまの作りではデータへの導線が失われます。
+        アカウントを必須にはせず、<strong>「引き継ぎ用の合言葉を控えておく」導線</strong>を
+        用意するのが、ワリカ流を保ったままの落としどころだと考えます。
+      </p>
+    </div>
+
+    <div class="note note--warn">
+      <div class="note__label">断り</div>
+      <p>
+        作業環境から <span class="mono-inline">walica.jp</span> へ直接接続できなかったため、
+        上記は紹介記事など二次情報にもとづきます。有料機能の有無や規約の細部は、
+        ご自身で開いて確認してください。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>現在地</h2>
+    <p>
+      公開サービスに必要なもののうち、すでに満たしているものと、まだ手つかずのものを分けます。
+    </p>
+    <div class="status">
+      <div class="status__row">
+        <span class="status__mark">済</span>
+        <span>共有URLを開くだけで参加できる。アカウント登録の画面を挟まない手軽さは、すでに実現している</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark">済</span>
+        <span>データはリアルタイムに同期し、圏外でも記録できて復帰後に送信される</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark">済</span>
+        <span>ホーム画面に追加してアプリのように使える。ビルド工程がなく、更新の反映も速い</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark">済</span>
+        <span>共有IDを知らない相手はデータに到達できない。ルールの検証も済んでいる</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark">済</span>
+        <span>登録なしで開いてすぐ使える。ワリカと同じ入り口の作りは、すでにできている</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark status__mark--gap">未</span>
+        <span>履歴を消したり機種を変えたりすると、リストへの導線が失われる（引き継ぎ手段がない）</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark status__mark--gap">未</span>
+        <span>地図と住所検索が、公開サービスでは使えない条件の無料サービスに依存している</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark status__mark--gap">未</span>
+        <span>費用が発生する仕組みと、それを守る仕組みがない</span>
+      </div>
+      <div class="status__row">
+        <span class="status__mark status__mark--gap">未</span>
+        <span>規約、プライバシーポリシー、問い合わせ先といった、サービスとしての外形がない</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>公開すると成り立たなくなるもの</h2>
+    <p>
+      いまの構成のうち、「知り合い数人」という前提があって初めて成立している部分を挙げます。
+      とくに最初の3つは、公開した時点で他者の利用規約に反する可能性があるため、
+      機能を追加するより先に片づける必要があります。
+    </p>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">一、外部サービスの利用条件</h3>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>地図タイル</h3>
+          <span class="badge badge--solved">代替あり</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>OpenStreetMap の公式タイルサーバーを直接読んでいる</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">問題</span>
+          <span>
+            公式タイルは寄付で運営されており、<strong>重い利用と一括取得が禁じられています</strong>。
+            利用者が増えれば、予告なく遮断され得ます
+          </span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">代替</span>
+          <span>次節に比較を載せました。<strong>地理院タイルで無料のまま解決できる見込み</strong>です</span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>住所からの位置検索</h3>
+          <span class="badge badge--solved">代替あり</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>Nominatim を1秒1回に制限して使っている</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">問題</span>
+          <span>
+            <a href="https://operations.osmfoundation.org/policies/nominatim/">Nominatim の利用規約</a>は
+            大量利用を明確に禁じ、上限を<strong>アプリ全体で合計1秒1回</strong>と定めています。
+            利用者ごとに1秒1回を守っても、サービス全体では超過します
+          </span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">代替</span>
+          <span>次節に比較を載せました。<strong>こちらも無料のまま解決できる見込み</strong>です</span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>物件ページの自動読み取り</h3>
+          <span class="badge badge--must">要判断</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>中継サーバーが物件ページを取得して項目を抽出している</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">問題</span>
+          <span>
+            自分が見ている1ページを読むのと、サービスとして継続的に取得するのは、
+            相手方から見れば別の行為です。各サイトの規約と robots.txt に照らした判断が要ります
+          </span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">代替</span>
+          <span>
+            <strong>3つの中で唯一、無料の代替がない項目です。</strong>
+            ただし次節のとおり、<strong>すでに実装済みの「テキスト貼り付け」だけを残す</strong>という
+            逃げ道があります
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">二、費用と悪用</h3>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>Firestore の無料枠</h3>
+          <span class="badge badge--before">公開前</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>無料の Spark プラン。上限に当たれば止まるだけで、請求は発生しない</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            無料枠では足りず、従量課金への移行が必要になります。同時に
+            <strong>請求額に上限がない状態</strong>になるため、予算アラートと、
+            使いすぎたときに自動で止める仕組みを先に用意します
+          </span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>書き込みの制限がない</h3>
+          <span class="badge badge--before">公開前</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>匿名認証を通れば、誰でも好きなだけ部屋を作って書き込める</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            公開＝誰でも通れる状態です。従量課金と組み合わさると、いたずらがそのまま請求になります。
+            アプリ以外からの接続を弾く仕組みと、利用者あたりの上限、
+            保存されるデータの形と大きさの検証が要ります
+          </span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>自動入力の費用負担</h3>
+          <span class="badge badge--before">公開前</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>運営者のキーを1つ共有し、費用は運営者が負担している</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            全利用者の抽出費用を運営者が持つことになります。無料で開放するなら回数制限、
+            利用者に負担してもらうなら自分のキーを入れる仕組みか課金、という分岐です
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">三、データとアカウント</h3>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>リストを引き継げない</h3>
+          <span class="badge badge--before">公開前</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>匿名認証のみ。共有IDは端末内と URL にしか存在しない</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            履歴を消す、機種を変える、といった日常の操作でリストへの導線が消えます。
+            数か月かけて貯めた記録が消えるのは、ワリカのように数日で終わる用途と違って致命的です
+          </span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">対応</span>
+          <span>
+            <strong>ログインを必須にする必要はありません。</strong>
+            「この URL を控えておいてください」と明示的に促す、書き出しを勧める、
+            任意でログインを紐づけられるようにする ── この程度で足ります
+          </span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>共有相手を外せない</h3>
+          <span class="badge badge--before">公開前</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>URLを知る人＝編集できる人。一度渡すと取り消せない</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            他人同士が使う以上、招待の取り消しと権限（閲覧のみ／編集可）は必須です。
+            いまの「URLが鍵」という設計そのものを、メンバー管理に置き換えます
+          </span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>リストが1つしか持てない</h3>
+          <span class="badge badge--later">公開後でも可</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>1つの端末につき1つのリスト</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            引っ越しは何度も起こります。「2024年の引っ越し」「実家の建て替え」のように
+            複数のリストを持てると、使い続けてもらえる理由になります
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">四、サービスとしての外形</h3>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>規約と個人情報の扱い</h3>
+          <span class="badge badge--must">公開前に必須</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>どちらもない</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            他人のデータを預かる以上、利用規約とプライバシーポリシーが要ります。
+            退会、データの削除、書き出しの導線もここに含まれます。
+            料金を受け取るなら、特定商取引法にもとづく表示も必要です
+          </span>
+        </div>
+      </div>
+
+      <div class="gap">
+        <div class="gap__head">
+          <h3>運用の受け皿</h3>
+          <span class="badge badge--before">公開前</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">いま</span>
+          <span>不具合は口頭で伝わり、直せる人が直している</span>
+        </div>
+        <div class="gap__line">
+          <span class="gap__key">公開時</span>
+          <span>
+            問い合わせ先、障害に気づく仕組み、バックアップ、
+            戻せる状態での更新。独自ドメインも、サービスとして案内するなら要ります
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>商用禁止のサービスを、何に置き換えるか</h2>
+    <p>
+      前節で挙げた3つについて、実際に選択肢を調べました。結論から言うと、
+      <strong>地図と住所検索は、無料のまま商用可の配信元に移せます。</strong>
+      費用が増えると見ていた部分が、ほぼ消えます。
+    </p>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">地図タイル</h3>
+      </div>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th>配信元</th>
+              <th>商用</th>
+              <th>費用</th>
+              <th>条件・注意</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="is-now">
+              <td>OSM 公式タイル</td>
+              <td><span class="no">不可</span></td>
+              <td class="num">無料</td>
+              <td>いまの依存先。重い利用・一括取得を禁止。遮断は予告なし</td>
+            </tr>
+            <tr class="is-pick">
+              <td>地理院タイル</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">無料</td>
+              <td>
+                出典の明示だけで<strong>申請不要</strong>。ウェブ上でリアルタイムに読み込む使い方が
+                想定されている。日本国内のみ
+              </td>
+            </tr>
+            <tr>
+              <td>MapTiler Cloud</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">無料枠あり</td>
+              <td>無料プランで月10万マップロード、カード登録不要。有料は月 $29 から</td>
+            </tr>
+            <tr>
+              <td>Mapbox</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">従量</td>
+              <td>1,000 マップロードあたり $5 前後から。規模が出ると単価は下がる</td>
+            </tr>
+            <tr>
+              <td>Stadia Maps</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">月 $20 〜</td>
+              <td><strong>無料プランは非商用限定。</strong>収益を得るなら Starter 以上</td>
+            </tr>
+            <tr>
+              <td>Protomaps（自前配信）</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">保管費のみ</td>
+              <td>地図データを自分のストレージに置いて配る。安いが運用は全部自分持ち</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pick-note">
+        <div class="pick-note__label">推す案</div>
+        <p>
+          <strong>地理院タイル。</strong>「日本国内しか出ない」という制約が、
+          日本の賃貸を探すこのアプリでは制約になりません。無料で、商用の可否を悩まずに済み、
+          出典を1行入れるだけで条件を満たせます。
+        </p>
+        <p>
+          保険として <strong>MapTiler の無料枠</strong>を控えに置いておくと、
+          地理院タイルが落ちたときや、海外物件まで広げたくなったときに切り替えられます。
+        </p>
+      </div>
+    </div>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">住所からの位置検索</h3>
+      </div>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th>選択肢</th>
+              <th>商用</th>
+              <th>費用</th>
+              <th>精度</th>
+              <th>条件・注意</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="is-now">
+              <td>Nominatim 公式</td>
+              <td><span class="no">不可</span></td>
+              <td class="num">無料</td>
+              <td>番地は当たらないことあり</td>
+              <td>いまの依存先。<strong>アプリ全体で合計1秒1回</strong>が上限。大量利用は禁止</td>
+            </tr>
+            <tr class="is-pick">
+              <td>Geolonia<br>Community Geocoder</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">無料</td>
+              <td>町丁目・大字まで</td>
+              <td>
+                コードは MIT、住所データは CC BY 4.0。国交省の位置参照情報が元。
+                静的ファイルとして配られており<strong>ブラウザだけで完結する</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>国土地理院<br>地名検索API</td>
+              <td>—</td>
+              <td class="num">無料</td>
+              <td>町丁目前後</td>
+              <td>
+                <strong>地理院地図から使われる前提のもの。</strong>予告なく仕様変更や停止があり得ると
+                明示されており、外部サービスの土台にするには弱い
+              </td>
+            </tr>
+            <tr>
+              <td>商用ジオコーダ<br>（Geolonia 有償 / Google など）</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">有料</td>
+              <td>番地まで</td>
+              <td>精度は最も高い。件数課金なので、登録のたびに費用が乗る</td>
+            </tr>
+            <tr>
+              <td>Nominatim を自前運用</td>
+              <td><span class="yes">可</span></td>
+              <td class="num">サーバー代</td>
+              <td>公式と同じ</td>
+              <td>日本だけなら現実的な規模。ただし構築と更新の手間が継続的に発生する</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pick-note">
+        <div class="pick-note__label">推す案</div>
+        <p>
+          <strong>Geolonia Community Geocoder。</strong>精度は町丁目までで、番地は出ません。
+          普通のアプリならこれは採用できない水準です。
+        </p>
+        <p>
+          ただしこのアプリは、<strong>もともと「地図を動かして十字を合わせる」位置指定を備えており</strong>、
+          しかも README にあるとおり<strong>「番地まで当たらないのは異常ではなく通常の流れ」として設計してあります</strong>。
+          町丁目まで寄せてから地図で詰める、という導線が最初から通っている。
+          この精度不足が致命傷にならない、数少ないアプリです。
+        </p>
+        <p>
+          さらに、これはブラウザ内で完結するため<strong>サーバーへの問い合わせが発生せず、
+          利用者が増えても費用が増えません</strong>。1秒1回の制限を気にする必要もなくなります。
+        </p>
+      </div>
+    </div>
+
+    <div class="gap-group">
+      <div class="gap-group__head">
+        <h3 class="gap-group__title">物件ページの自動読み取り</h3>
+      </div>
+      <p>
+        ここだけは、代わりのサービスに置き換えて解決する種類の問題ではありません。
+        「他社のページを、サービスとして継続的に取りに行ってよいか」という話だからです。
+        取り得る形は3つです。
+      </p>
+
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th>案</th>
+              <th>規約上の主体</th>
+              <th>費用</th>
+              <th>使い勝手</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="is-pick">
+              <td>テキスト貼り付けだけ残す</td>
+              <td>利用者（自分が見たページを自分で貼る）</td>
+              <td class="num">AI 費用のみ</td>
+              <td>1手間増えるが、<strong>実装済みの経路をそのまま使える</strong></td>
+            </tr>
+            <tr>
+              <td>利用者が自分のキーを入れる</td>
+              <td>利用者</td>
+              <td class="num">利用者負担</td>
+              <td>URL を貼るだけは維持できるが、<strong>キーを用意できる人しか使えない</strong></td>
+            </tr>
+            <tr>
+              <td>公開版から外す</td>
+              <td>—</td>
+              <td class="num">0円</td>
+              <td>手入力のみ。判断がつくまでの暫定案としては妥当</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pick-note">
+        <div class="pick-note__label">推す案</div>
+        <p>
+          <strong>テキスト貼り付けだけを残す。</strong>これはすでに
+          「URL で読めなかったとき」の受け皿として実装してあり、動作も確認済みです。
+        </p>
+        <p>
+          この形なら、<strong>こちらのサーバーが物件サイトへ取りに行きません</strong>。
+          利用者が自分の画面で開いたページの文字を、自分でコピーして貼るだけになるので、
+          スクレイピングの論点そのものが消えます。残るのは AI の抽出費用だけで、
+          これは回数制限で抑えられます。
+        </p>
+        <p>
+          URL を貼るだけの体験は失われますが、<strong>機能全体を落とさずに済む</strong>のが利点です。
+        </p>
+      </div>
+    </div>
+
+    <div class="note">
+      <div class="note__label">出典表記について</div>
+      <p>
+        地理院タイルも Geolonia 住所データも、無料で商用に使える代わりに
+        <strong>出典の明示が条件</strong>です。地図の隅に「国土地理院」、
+        クレジット表記に Geolonia 住所データ（CC BY 4.0）を入れる必要があります。
+        費用ではなく表示義務として、実装時に忘れないよう記録しておきます。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>自動読み取りを、会員登録なしで売れるか</h2>
+    <p>
+      「自動読み取りはいずれ有料オプションにしたいが、会員登録がないので難しい」という懸念について。
+      <strong>結論から言うと、できます。</strong>考え方を1つ変えるだけです。
+    </p>
+
+    <div class="pick-note">
+      <div class="pick-note__label">考え方</div>
+      <p>
+        <strong>権利を「人」ではなく「リスト」に紐づけて売ります。</strong>
+      </p>
+      <p>
+        いまの設計では、共有URL に埋まっている共有IDが、すでにリストの識別子になっています。
+        決済のときにこのIDを一緒に渡し、支払いが完了したら
+        <strong>そのIDに対して「自動読み取りの残り回数」を書き込む</strong>。
+        次にそのリストを開いた人は、誰であれ自動読み取りが使えます。
+      </p>
+      <p>
+        つまり<strong>アカウントの代わりに、共有URL が権利の持ち主になります。</strong>
+        ワリカがグループをURLで表しているのと同じ考え方の、素直な延長です。
+        「同じリストを見ている人なら誰でも使える」という挙動は、
+        二人で物件を探している場面ではむしろ自然です。
+      </p>
+    </div>
+
+    <p>
+      決済そのものも障害になりません。Stripe の Checkout のような仕組みは、
+      <strong>購入者がこちらのサービスに登録していなくても使えます。</strong>
+      カード情報は決済事業者が扱うので、こちらがカード番号に触れることもありません。
+      支払い完了の通知を中継サーバーで受け取り、共有IDに回数を足すだけです。
+    </p>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th>売り方</th>
+            <th>登録なしとの相性</th>
+            <th>向き・不向き</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="is-pick">
+            <td>リスト単位の買い切り</td>
+            <td><span class="yes">良い</span></td>
+            <td>
+              「このリストで自動読み取り○回」を一度だけ払う。
+              <strong>引っ越し1回で終わる用途と噛み合います</strong>
+            </td>
+          </tr>
+          <tr class="is-pick">
+            <td>プリペイドコード</td>
+            <td><span class="yes">良い</span></td>
+            <td>
+              コードを買い、リストに入力して引き換える。
+              決済とアプリを完全に切り離せ、人に贈ることもできます
+            </td>
+          </tr>
+          <tr>
+            <td>月額サブスク</td>
+            <td><span class="no">悪い</span></td>
+            <td>
+              解約の導線に本人確認が要ります。<strong>登録なしとは根本的に相性が悪く、推しません</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note note--warn">
+      <div class="note__label">承知しておくべき代償</div>
+      <ul>
+        <li>
+          <strong>URL を失うと、買った権利も失われます。</strong>データが消えるのと同じ構造ですが、
+          お金が絡むと重みが違います。購入直後に「このURLを控えてください」を
+          最も強い形で出す必要があります
+        </li>
+        <li>
+          <strong>問い合わせの本人確認ができません。</strong>「買ったのに使えない」と連絡が来ても、
+          その人が購入者かを確かめる手段がありません。決済事業者が送る領収書メールの
+          決済IDを照合してもらう、といった運用を先に決めておく必要があります
+        </li>
+        <li>
+          <strong>料金を受け取った時点で、特定商取引法にもとづく表示が必要になります。</strong>
+          個人で運営する場合、氏名・住所・電話番号の扱いをどうするかを調べたうえで決めてください
+        </li>
+        <li>
+          <strong>「完全に匿名」ではなくなります。</strong>購入者のメールアドレスは決済事業者側に残ります。
+          プライバシーポリシーに、その旨を書く必要があります
+        </li>
+      </ul>
+    </div>
+
+    <p>
+      なお、有料化を見据えるなら<strong>ここで前節の判断が効いてきます。</strong>
+      自動読み取りを「テキスト貼り付けのみ」に絞る案は、有料化とも噛み合います。
+      利用者が自分で開いたページの文字を貼るだけなので、こちらは物件サイトへ取りに行かず、
+      <strong>売り物が「AI による整形」という自分たちの提供物だけになる</strong>ためです。
+      他社のページを取得したものを売る形は、規約上も説明上も面倒が増えます。
+    </p>
+  </section>
+
+  <section>
+    <h2>進め方</h2>
+    <p>
+      前の版から2つ変わりました。<strong>段階1が「有料サービスへの移行」ではなく
+      「無料の商用可サービスへの差し替え」になった</strong>こと、そして
+      <strong>ログインの段階がまるごと軽くなった</strong>ことです。
+      各段階は前の段階が終わっていなくても着手できますが、公開だけは全部が揃ってからです。
+    </p>
+
+    <div class="phases">
+
+      <div class="phase">
+        <div class="phase__num">段階 0</div>
+        <div class="phase__body">
+          <h3>方針を決める</h3>
+          <p class="phase__goal">
+            ここが決まらないと、以降の作りが変わります。コードを書く前に確定させます。
+          </p>
+          <ul>
+            <li>自動入力をどの形で残すか（テキスト貼り付けのみ／利用者のキー／外す）</li>
+            <li>想定する規模。数十人か、数千人かで費用の桁が変わります</li>
+            <li>運営主体を個人にするか。規約と問い合わせ先の書き方が変わります</li>
+            <li>
+              有料化の時期は<strong>後で決めて構いません</strong>。
+              ただし地図の配信元だけは、最初から商用可のものを選んでおきます
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__num">段階 1</div>
+        <div class="phase__body">
+          <h3>外部依存を、商用可のものに差し替える</h3>
+          <p class="phase__goal">
+            公開せずに進められます。前節の調査により、<strong>この段階は費用ゼロで完了できる見込み</strong>です。
+          </p>
+          <ul>
+            <li>地図タイルを地理院タイルに差し替え、出典表記を入れる</li>
+            <li>住所検索を Geolonia Community Geocoder に差し替え、クレジットを入れる</li>
+            <li>町丁目までしか出ない前提で、地図での位置調整への案内を強める</li>
+            <li>自動入力を、段階0で決めた形に整理する</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__num">段階 2</div>
+        <div class="phase__body">
+          <h3>費用の暴走を止める</h3>
+          <p class="phase__goal">
+            公開＝誰でも書き込める状態です。人を入れる前に、必ずここを通します。
+          </p>
+          <ul>
+            <li>従量課金へ移行し、同時に予算アラートと自動停止を用意する</li>
+            <li>アプリ以外からの接続を弾く仕組みを入れる</li>
+            <li>保存されるデータの形・大きさ・件数をルールで検証する</li>
+            <li>AI 抽出に、利用者あたりの回数制限をかける</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__num">段階 3</div>
+        <div class="phase__body">
+          <h3>知らない人が迷わない形にする</h3>
+          <p class="phase__goal">
+            いまの画面は、作った本人が使う前提で書かれています。それを外します。
+          </p>
+          <ul>
+            <li>何のサービスかを説明する入口の画面を作る</li>
+            <li>中継サーバーのアドレスと合言葉を、利用者に見せない形にする</li>
+            <li>リストの URL を控えるよう促す導線を入れる（引き継ぎの唯一の手段になるため）</li>
+            <li>共有を QR コードでも渡せるようにする</li>
+            <li>まだ何もない状態、失敗した状態、迷ったときの案内を整える</li>
+            <li>独自ドメインに移す</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__num">段階 4</div>
+        <div class="phase__body">
+          <h3>公開に必要なものを揃える</h3>
+          <p class="phase__goal">
+            機能ではなく、預かる責任のための準備です。
+          </p>
+          <ul>
+            <li>利用規約とプライバシーポリシーを用意する</li>
+            <li>問い合わせ先と、障害に気づく仕組みを用意する</li>
+            <li>バックアップと、元に戻せる更新の手順を用意する</li>
+            <li>身内以外の少人数に使ってもらい、詰まる場所を洗い出す</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__num">段階 5</div>
+        <div class="phase__body">
+          <h3>公開してから</h3>
+          <p class="phase__goal">
+            見立てが外れる前提で、直せる状態を保ちます。
+          </p>
+          <ul>
+            <li>実際の費用を測り、無料枠の線引きを調整する</li>
+            <li>問い合わせから、想定していなかった使われ方を拾う</li>
+            <li>使われていない機能を畳む判断をする</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__num">段階 6</div>
+        <div class="phase__body">
+          <h3>自動読み取りを有料オプションにする</h3>
+          <p class="phase__goal">
+            使われ方と実費が見えてから着手します。<strong>先に無料で公開しておいて構いません。</strong>
+            価格の根拠は、段階5で測った実際の抽出費用から決めます。
+          </p>
+          <ul>
+            <li>共有IDに残り回数を持たせ、リスト単位で権利を管理する</li>
+            <li>決済を用意し、支払い完了の通知で回数を加算する</li>
+            <li>購入直後に、URL を控えるよう最も強い形で促す</li>
+            <li>特定商取引法にもとづく表示と、購入者向けの問い合わせ手順を用意する</li>
+            <li>プライバシーポリシーに、決済事業者へ渡る情報を追記する</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>費用の見立て</h2>
+    <p>
+      代替の調査を反映した見立てです。<strong>前の版より大きく下がりました。</strong>
+      月に100人が、ひとり20件の物件を登録する程度の使われ方を想定しています。
+      <strong>桁を掴むための目安</strong>として読んでください。
+    </p>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>いま</th>
+            <th>公開後</th>
+            <th>根拠と注意</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>データベース</td>
+            <td class="num">0円</td>
+            <td class="num">〜数百円/月</td>
+            <td>読み取り回数が支配的。無料枠を超えた分だけ。<strong>上限がない唯一の項目</strong></td>
+          </tr>
+          <tr class="is-pick">
+            <td>地図タイル</td>
+            <td class="num">0円</td>
+            <td class="num">0円</td>
+            <td>地理院タイルに移せば無料のまま。条件は出典の明示のみ</td>
+          </tr>
+          <tr class="is-pick">
+            <td>住所検索</td>
+            <td class="num">0円</td>
+            <td class="num">0円</td>
+            <td>ブラウザ内で完結する方式に移せば、利用者が増えても増えない</td>
+          </tr>
+          <tr>
+            <td>自動入力</td>
+            <td class="num">1件10円前後</td>
+            <td class="num">方針次第</td>
+            <td>残すなら最大の変動要因。回数制限で抑える</td>
+          </tr>
+          <tr>
+            <td>ドメイン</td>
+            <td class="num">0円</td>
+            <td class="num">年1〜2千円</td>
+            <td>固定費</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note note--warn">
+      <div class="note__label">注意</div>
+      <p>
+        代替が見つかったことで、<strong>従量課金で青天井になり得る項目はデータベースと自動入力の2つに絞られました。</strong>
+        逆に言えば、この2つには必ず上限を仕掛けてください。
+        予算アラートと自動停止は、利用者を増やす前に用意する必要があります。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>先に決めていただきたいこと</h2>
+    <p>
+      私の側では決められない、方針の問題です。ここが決まれば段階1から着手できます。
+    </p>
+    <div class="decisions">
+
+      <div class="decision">
+        <div class="decision__q">有料オプションは、いつ入れますか。</div>
+        <div class="decision__why">
+          「いずれ自動読み取りを有料に」という方針は伺いました。前節のとおり
+          <strong>登録なしのままでも実現できます</strong>ので、急いで決める必要はありません。
+          ただし1つだけ先に効く点があります。<strong>いずれ料金を受け取るなら、
+          地図の配信元は最初から商用可のものを選んでおく必要があります</strong>
+          （Stadia Maps の無料プランのように非商用限定のものがあるため）。
+          推している地理院タイルは商用可なので、この点は問題になりません。
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision__q">自動入力を、どの形で残しますか。</div>
+        <div class="decision__why">
+          <strong>テキスト貼り付けのみ</strong>を推しますが、URL を貼るだけの手軽さは失われます。
+          そこを重視するなら「利用者が自分のキーを入れる」、判断を先送りするなら「公開版から外す」。
+          この3つのうち、どれかを選んでください。
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision__q">地図の精度が町丁目までになることを、許容できますか。</div>
+        <div class="decision__why">
+          無料で商用可のジオコーダを採るなら、住所入力で番地までは寄りません。
+          いまも Nominatim で番地が当たらないことはあり、地図で詰める導線は用意済みですが、
+          <strong>「当たらないのが常態になる」</strong>点は体験の変化です。
+          許容できないなら、有料のジオコーダを月数千円規模で見込む必要があります。
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision__q">どれくらいの規模を想定しますか。</div>
+        <div class="decision__why">
+          数十人なら、いまの構成の延長で足ります。数千人以上を見込むなら、
+          データベースの費用が効いてきて、地理院タイルへの負荷も配慮が要ります。
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision__q">運営者として名前と連絡先を出せますか。</div>
+        <div class="decision__why">
+          プライバシーポリシーと問い合わせ先には、運営主体の記載が必要です。
+          個人名を出したくない場合、書き方の工夫か、別の形が要ります。
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>私が確認できていないこと</h2>
+    <div class="note note--warn">
+      <div class="note__label">未検証</div>
+      <p>
+        この節は前の版から埋まりましたが、まだ残っています。
+        <strong>作業環境から接続できないサイトがあり、一次情報に当たれていない箇所があります。</strong>
+      </p>
+      <ul>
+        <li>
+          <strong>ワリカ本体。</strong><span class="mono-inline">walica.jp</span> へ接続できず、
+          紹介記事などの二次情報から性質を読み取りました。有料機能や規約の細部は未確認です
+        </li>
+        <li>
+          <strong>地理院タイルの利用規約の原文。</strong>
+          <span class="mono-inline">maps.gsi.go.jp</span> へ接続できず、
+          「出典明示のみで申請不要」は検索結果を通じた確認にとどまります。
+          採用を決める前に、地理院地図の利用規約と地理院タイル一覧のページをご自身で確認してください
+        </li>
+        <li>
+          <strong>物件サイトの利用規約と robots.txt。</strong>各サイトへ接続できず、
+          URL からの自動取得を続けてよいかの判断材料が揃っていません。
+          テキスト貼り付けのみに絞る案を推しているのは、この確認を待たずに前へ進めるためでもあります
+        </li>
+        <li>
+          <strong>各社の最新の料金と無料枠。</strong>表の数値は検索時点の情報です。
+          この種の条件は変わるため、採用の直前に公式ページで確認してください
+        </li>
+        <li>
+          <strong>Community Geocoder の実際の当たり具合。</strong>
+          横浜・東京の実在の住所でどこまで寄るかは、差し替えてから実測する必要があります
+        </li>
+        <li>
+          <strong>特定商取引法で、個人が氏名・住所をどこまで出す必要があるか。</strong>
+          有料化の際に必ず関わる論点ですが、条件付きで省略できる場合があるとも聞きます。
+          <strong>私は確認していません。</strong>段階6に入る前に、一次情報か専門家に当たってください
+        </li>
+        <li>
+          <strong>決済事業者の規約と手数料。</strong>Stripe を例に挙げましたが、
+          実際に使えるか・手数料がいくらかは確認していません
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>参照した情報</h2>
+    <ul>
+      <li><a href="https://operations.osmfoundation.org/policies/tiles/">OSM Tile Usage Policy</a> — 重い利用と一括取得の禁止</li>
+      <li><a href="https://operations.osmfoundation.org/policies/nominatim/">Nominatim Usage Policy</a> — 大量利用の禁止、合計1秒1回の上限</li>
+      <li><a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル一覧</a> / <a href="https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html">国土地理院コンテンツ利用規約</a> / <a href="https://www.gsi.go.jp/LAW/2930-meizi.html">出典の記載</a></li>
+      <li><a href="https://github.com/geolonia/community-geocoder">Geolonia Community Geocoder</a> / <a href="https://geolonia.github.io/japanese-addresses/">Geolonia 住所データ</a></li>
+      <li><a href="https://github.com/gsi-cyberjapan/gsimaps/issues/29">gsimaps Issue #29</a> — 地名検索API を独自システムで使う件</li>
+      <li><a href="https://stadiamaps.com/pricing/">Stadia Maps 料金</a> — 無料プランは非商用限定</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      この文書は計画のみで、実装は含みません。着手する段階が決まったら、
+      その段階だけを対象にした詳細な手順に落とします。
+    </p>
+    <p>
+      いま止まっている作業として、名前の変更とキャッシュ不具合の修正を含む
+      Pull Request #4 が未 merge のままです。この計画とは独立して進められます。
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
