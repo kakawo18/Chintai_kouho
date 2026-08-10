@@ -5,6 +5,10 @@
   var M = Chintai.model;
   var ui = Chintai.ui;
 
+  // 端末に古い版が残っているかを利用者自身が判断できるようにするための目印。
+  // 機能を足したときはここも更新する。
+  var APP_VERSION = 'v2（自動入力・築年数・路線の選択に対応）';
+
   var properties = [];
   var members = {};
   var filter = null;
@@ -249,6 +253,27 @@
       });
       renderExtractState();
       ui.toast('自動入力の設定を保存しました');
+    });
+
+    $('app-version').textContent = APP_VERSION;
+
+    // 保存済みのキャッシュと Service Worker を捨てて取り直す。
+    // 物件データは Firestore にあるので、この操作で失われるものはない。
+    $('btn-refresh-app').addEventListener('click', function () {
+      ui.toast('最新版を取り直しています…');
+      var jobs = [];
+      if (window.caches && caches.keys) {
+        jobs.push(caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        }));
+      }
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+          return Promise.all(regs.map(function (r) { return r.unregister(); }));
+        }));
+      }
+      Promise.all(jobs).catch(function () { /* 消せなくても読み込み直しは試す */ })
+        .then(function () { location.reload(); });
     });
 
     $('btn-export').addEventListener('click', exportJson);
