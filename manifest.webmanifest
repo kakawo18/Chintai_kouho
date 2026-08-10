@@ -1,7 +1,7 @@
 {
-  "name": "賃貸候補メモ",
-  "short_name": "賃貸候補",
-  "description": "引っ越し候補の賃貸物件を地図にメモして、同居人と共同編集するアプリ",
+  "name": "物件メモ",
+  "short_name": "物件メモ",
+  "description": "気になる物件を地図にメモして見比べるアプリ。ひとりでも、誰かと共有しても使えます",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

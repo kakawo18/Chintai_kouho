@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2f6fd0">
-<title>賃貸候補メモ</title>
+<title>物件メモ</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -227,8 +227,11 @@
   </header>
   <div class="panel__body">
     <div class="menu-block">
-      <p class="menu-block__title">同居人と共有</p>
-      <p class="menu-block__desc">この URL を送ると、相手も同じリストを編集できます。</p>
+      <p class="menu-block__title">共有（使わなくても構いません）</p>
+      <p class="menu-block__desc">
+        この URL を送ると、相手も同じリストを編集できるようになります。
+        ひとりで使う場合は何もしなくて大丈夫です。
+      </p>
       <input id="share-url" class="share-url" type="text" readonly>
       <div class="row">
         <button id="btn-copy" class="btn btn--primary btn--sm" type="button">URLをコピー</button>
@@ -292,10 +295,10 @@
 <!-- 初回のみ表示する名前の登録 -->
 <div id="welcome-panel" class="panel panel--center" hidden>
   <div class="welcome">
-    <h1 class="welcome__title">賃貸候補メモ</h1>
-    <p id="welcome-desc" class="welcome__desc">地図に候補をためて、同居人と一緒に選びます。</p>
+    <h1 class="welcome__title">物件メモ</h1>
+    <p id="welcome-desc" class="welcome__desc">気になる物件を地図にためて、条件を見比べます。</p>
     <label class="field">
-      <span class="field__label">表示名（同居人に見えます）</span>
+      <span class="field__label">表示名（誰かと共有したときに相手に見えます）</span>
       <input id="welcome-nickname" type="text" placeholder="例：たろう" maxlength="20">
     </label>
     <button id="welcome-start" class="btn btn--primary btn--block" type="button">はじめる</button>

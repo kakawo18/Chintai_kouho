@@ -423,7 +423,8 @@
 
   function remove() {
     if (!current) return;
-    if (!confirm('「' + current.name + '」を削除します。同居人のリストからも消えます。よろしいですか？')) return;
+    if (!confirm('「' + current.name + '」を削除します。' +
+                 '共有している場合は相手のリストからも消えます。よろしいですか？')) return;
     handlers.onDelete(current.id);
     close();
   }
