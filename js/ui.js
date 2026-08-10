@@ -144,7 +144,7 @@
     if (!uid) return '不明';
     var m = ctx.members[uid];
     if (m && m.nickname) return m.nickname;
-    return uid === ctx.uid ? 'あなた' : '同居人';
+    return uid === ctx.uid ? 'あなた' : '相手';
   }
 
   function starsHtml(value) {

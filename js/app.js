@@ -7,7 +7,7 @@
 
   // 端末に古い版が残っているかを利用者自身が判断できるようにするための目印。
   // 機能を足したときはここも更新する。
-  var APP_VERSION = 'v2（自動入力・築年数・路線の選択に対応）';
+  var APP_VERSION = 'v3（物件メモ／自動入力・築年数・路線の選択に対応）';
 
   var properties = [];
   var members = {};
@@ -144,7 +144,7 @@
       ('0' + (d.getMonth() + 1)).slice(-2) +
       ('0' + d.getDate()).slice(-2);
     a.href = url;
-    a.download = 'chintai-kouho-' + stamp + '.json';
+    a.download = 'bukken-memo-' + stamp + '.json';
     a.click();
     URL.revokeObjectURL(url);
     ui.toast(properties.length + '件を書き出しました');
@@ -233,8 +233,8 @@
       shareBtn.hidden = false;
       shareBtn.addEventListener('click', function () {
         navigator.share({
-          title: '賃貸候補メモ',
-          text: '引っ越し候補のリストを共有します',
+          title: '物件メモ',
+          text: '物件メモのリストを共有します',
           url: Chintai.session.shareUrl(roomId)
         }).catch(function () { /* ユーザーが閉じただけなので何もしない */ });
       });
