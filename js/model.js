@@ -3,11 +3,25 @@
 (function (Chintai) {
   'use strict';
 
+  // 検討ステータスの色。色の意味は、アプリ全体で次のように分けている。
+  //
+  //   青  (--accent)  操作できるもの。ボタン、リンク、選択中であること
+  //   赤  (--danger)  取り消せない操作。削除
+  //   琥珀(--unsure)  データが足りないこと。位置が未確定
+  //   下の4色          検討がどこまで進んだか
+  //
+  // 以前は「気になる」が青（--accent と同じ値）で、ボタンの青と状態の青が
+  // 同じ意味に見えていた。また「内見予定」の橙は「要確認」の琥珀と色相が
+  // ほぼ同じで、橙のピンに琥珀の印が乗ると印が沈んでいた。
+  // どちらも重なりを解いてある。あわせて、白抜き文字が読める濃さに揃えた。
+  //
+  // 紫と赤紫が隣り合っているのは、「気になる」と「内見予定」がどちらも
+  // 検討中の段階だから。緑は終わり、灰は候補から外れたことを表す。
   var STATUSES = [
-    { key: 'interested', label: '気になる', color: '#2f6fd0' },
-    { key: 'scheduled', label: '内見予定', color: '#e08a1e' },
-    { key: 'visited', label: '内見済', color: '#2a9d5c' },
-    { key: 'rejected', label: '候補外', color: '#8a8f98' }
+    { key: 'interested', label: '気になる', color: '#6d4aa8' },
+    { key: 'scheduled', label: '内見予定', color: '#b23a7d' },
+    { key: 'visited', label: '内見済', color: '#1f7a4d' },
+    { key: 'rejected', label: '候補外', color: '#6b717a' }
   ];
 
   var STATUS_BY_KEY = {};
