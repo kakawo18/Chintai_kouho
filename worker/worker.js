@@ -11,9 +11,16 @@
 //   APP_PASSPHRASE … このアプリからの利用だけを通すための合言葉。Secret として登録する
 //   ALLOWED_ORIGIN … 許可するアプリの配信元。例: https://kakawo18.github.io
 //   KIMI_BASE_URL  … 省略時 https://api.moonshot.ai/v1
+//   KIMI_MODEL     … 使うモデル。省略時 kimi-k2.6
 
 const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
-const MODEL = 'kimi-k3';
+
+// 物件ページから決まった項目を抜き出すだけの仕事なので、最上位のモデルは要らない。
+// K3 から K2.6 に落として費用を約1/3にしている（入力 $3→$0.95、出力 $15→$4 / 100万トークン）。
+// K2.6 も strict な JSON スキーマに対応しているため、送る中身は変えていない。
+// 変えたくなったら wrangler.toml か Cloudflare の画面で KIMI_MODEL を書き換える。
+// コードを触る必要はない。
+const DEFAULT_MODEL = 'kimi-k2.6';
 
 // 取り込むページ本文の上限。長すぎるページで料金と時間が膨らむのを防ぐ。
 const MAX_PAGE_CHARS = 60000;
@@ -130,7 +137,7 @@ async function callKimi(env, sourceText) {
   const today = new Date().toISOString().slice(0, 10);
 
   const body = {
-    model: MODEL,
+    model: env.KIMI_MODEL || DEFAULT_MODEL,
     max_tokens: 2000,
     messages: [
       {
