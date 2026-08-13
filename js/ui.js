@@ -331,8 +331,8 @@
           (p.commuteNote ? '（' + escapeHtml(p.commuteNote) + '）' : '')) +
         specRow('住所', escapeHtml(p.address) +
           (M.isLocationApprox(p) && M.addressLevelLabel(p.addressLevel)
-            ? '<br><span class="hint">ページには' +
-              escapeHtml(M.addressLevelLabel(p.addressLevel)) + 'しか書かれていませんでした</span>'
+            ? '<br><span class="hint">位置は' +
+              escapeHtml(M.addressLevelLabel(p.addressLevel)) + 'までの精度です</span>'
             : '')) +
         specRow('物件ページ', p.url ? '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">開く</a>' : '') +
         specRow('メモ', p.memo ? escapeHtml(p.memo).replace(/\n/g, '<br>') : '') +

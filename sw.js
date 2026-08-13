@@ -6,7 +6,7 @@
 //   混ざり、画面にボタンはあるのに何も起きない状態が起こり得た。
 //   そこでアプリ本体は通信優先にし、通信できないときだけキャッシュを使う。
 //   オフラインでの起動はこれまでどおり可能で、常に版が揃うようになる。
-var APP_VERSION = 'v5';
+var APP_VERSION = 'v6';
 var SHELL_CACHE = 'chintai-shell-' + APP_VERSION;
 var TILE_CACHE = 'chintai-tiles-v1';
 var TILE_LIMIT = 400;

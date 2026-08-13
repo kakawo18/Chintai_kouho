@@ -353,38 +353,64 @@
         return;
       }
 
-      // 自動入力から来た場合は、候補を選ばせずに先頭を採用する。
-      // 番地まで書かれていない住所は、どの候補を選んでも「おおよそ」でしかない。
-      // ならば選ばせる手間を省き、確からしさのほうを記録しておくほうがよい。
+      // 自動入力から来た場合は、候補を選ばせずに採用する。
+      // ただし先頭をそのまま採るのは危険。「宮前町」のような町名は全国にあり、
+      // 検索結果の1位が目的の市区町村とは限らない。
+      // 都道府県と市区町村が一致した候補だけを採り、無ければ採用しない。
       // 読み取った住所の文字は、ページに書かれていたままを残す（検索結果で上書きしない）。
       if (opts.adoptFirst) {
-        box.hidden = true;
-        position = { lat: items[0].lat, lng: items[0].lng };
-        locationFixed = (addressLevel === 'banchi');
-        setGeoStatus('');
-        syncPosition();
+        var hit = Chintai.geo.pickBest(items, q);
+        if (hit) {
+          box.hidden = true;
+          position = { lat: hit.lat, lng: hit.lng };
+          locationFixed = (addressLevel === 'banchi' && opts.exact !== false);
+          setGeoStatus('');
+          syncPosition();
+          return;
+        }
+
+        // 町名まで一致しないときは、市区町村まで戻して探し直す。
+        // 違う土地に置くくらいなら、範囲を広げて正しい市区町村に置くほうがよい。
+        var coarse = opts.allowCoarse === false ? '' : Chintai.geo.coarser(q);
+        if (coarse) {
+          setGeoStatus('町名では見つからないため、市区町村までで探しています…');
+          addressLevel = 'city';
+          runSearch(coarse, { adoptFirst: true, allowCoarse: false, exact: false });
+          return;
+        }
+
+        // どこにも当てられなかった。勝手に決めず、候補を出して選んでもらう。
+        setGeoStatus('住所に合う場所が見つかりませんでした。' +
+          '下の候補から選ぶか、「地図で位置を指定」から置いてください。');
+        showCandidates(box, items);
         return;
       }
 
       setGeoStatus('');
-      items.forEach(function (it) {
-        var li = document.createElement('li');
-        li.textContent = it.label;
-        li.addEventListener('click', function () {
-          position = { lat: it.lat, lng: it.lng };
-          // 自分で候補を選んだのだから、確かめたものとして扱う
-          locationFixed = true;
-          form().address.value = it.label;
-          box.hidden = true;
-          syncPosition();
-        });
-        box.appendChild(li);
-      });
-      box.hidden = false;
+      showCandidates(box, items);
     }).catch(function () {
       $('address-results').hidden = true;
       setGeoStatus('住所検索に接続できませんでした。「地図で位置を指定」から置いてください。');
     });
+  }
+
+  // 候補の一覧。押した時点で本人が確かめたことになるので、位置は確定として扱う。
+  function showCandidates(box, items) {
+    box.innerHTML = '';
+    items.forEach(function (it) {
+      var li = document.createElement('li');
+      li.textContent = it.label;
+      li.addEventListener('click', function () {
+        position = { lat: it.lat, lng: it.lng };
+        locationFixed = true;
+        form().address.value = it.label;
+        box.hidden = true;
+        setGeoStatus('');
+        syncPosition();
+      });
+      box.appendChild(li);
+    });
+    box.hidden = false;
   }
 
   /* ---------- 地図ピッカー ---------- */
