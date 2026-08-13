@@ -6,6 +6,8 @@
   var handlers = {};
   var current = null;   // 編集中の物件（新規なら null）
   var position = { lat: null, lng: null };
+  var addressLevel = '';      // 元のページに住所がどこまで書かれていたか
+  var locationFixed = true;   // 位置を人が確かめたか
   var rating = 0;
   var status = 'interested';
   var searchTimer = null;
@@ -48,8 +50,13 @@
     $('form-save').addEventListener('click', save);
     $('form-delete').addEventListener('click', remove);
     $('btn-pick-on-map').addEventListener('click', startPicking);
-    $('picker-cancel').addEventListener('click', cancelPicking);
-    $('picker-confirm').addEventListener('click', confirmPicking);
+
+    // 地図で置き直さずとも、出てきた位置でよければその場で確定できるようにする
+    $('btn-confirm-location').addEventListener('click', function () {
+      locationFixed = true;
+      syncPosition();
+      Chintai.ui.toast('位置を確定しました');
+    });
 
     $('address-input').addEventListener('input', onAddressInput);
     $('autofill-run').addEventListener('click', runAutofill);
@@ -88,12 +95,16 @@
       setLine(current.line);
       f.imageUrls.value = current.imageUrls.join('\n');
       position = { lat: current.lat, lng: current.lng };
+      addressLevel = current.addressLevel;
+      locationFixed = !M.isLocationApprox(current);
       status = current.status;
       rating = M.ratingOf(current, handlers.getUid());
     } else {
       $('form-title').textContent = '物件を追加';
       $('form-delete').hidden = true;
       position = { lat: null, lng: null };
+      addressLevel = '';
+      locationFixed = true;
       status = 'interested';
       rating = 0;
       setLine('');
@@ -180,11 +191,26 @@
 
   function syncPosition() {
     var view = $('latlng-view');
+    var box = $('location-approx');
+
     if (position.lat === null || position.lng === null) {
       view.textContent = '未設定';
-    } else {
-      view.textContent = position.lat.toFixed(5) + ', ' + position.lng.toFixed(5);
+      box.hidden = true;
+      return;
     }
+
+    view.textContent = position.lat.toFixed(5) + ', ' + position.lng.toFixed(5);
+
+    if (locationFixed) {
+      box.hidden = true;
+      return;
+    }
+
+    // 何が足りなくてこの位置なのかを書く。理由が分かれば直しようがある。
+    $('location-approx-text').textContent =
+      M.approxNote({ addressLevel: addressLevel }) +
+      '。このまま保存でき、あとから直せます。';
+    box.hidden = false;
   }
 
   // 敷金・礼金はヶ月で入力してもらい、家賃から円に換算してその場に出す
@@ -278,8 +304,15 @@
     updateCostPreview();
     syncBuiltYearHint();
 
-    // 住所が入ったら地図の位置も自動で取りにいく（失敗しても入力は残る）
-    if (data.address && position.lat === null) runSearch(data.address);
+    // 住所が入ったら地図の位置も自動で取りにいく（失敗しても入力は残る）。
+    // 番地まで書かれていなかった場合は、出てきた位置を「おおよそ」として持つ。
+    // 検索するのは欄に実際に入っている住所。読み取った住所と違うなら
+    // （＝先に自分で書いていたなら）粒度は当てにならないので持たない。
+    var addressForSearch = f.address.value.trim();
+    if (addressForSearch && position.lat === null) {
+      addressLevel = (addressForSearch === data.address) ? data.addressLevel : '';
+      runSearch(addressForSearch, { adoptFirst: true });
+    }
 
     return filled;
   }
@@ -308,7 +341,8 @@
     el.hidden = !text;
   }
 
-  function runSearch(q) {
+  function runSearch(q, options) {
+    var opts = options || {};
     setGeoStatus('住所を検索しています…');
     Chintai.geo.search(q).then(function (items) {
       var box = $('address-results');
@@ -318,12 +352,28 @@
         setGeoStatus('候補が見つかりませんでした。「地図で位置を指定」から置いてください。');
         return;
       }
+
+      // 自動入力から来た場合は、候補を選ばせずに先頭を採用する。
+      // 番地まで書かれていない住所は、どの候補を選んでも「おおよそ」でしかない。
+      // ならば選ばせる手間を省き、確からしさのほうを記録しておくほうがよい。
+      // 読み取った住所の文字は、ページに書かれていたままを残す（検索結果で上書きしない）。
+      if (opts.adoptFirst) {
+        box.hidden = true;
+        position = { lat: items[0].lat, lng: items[0].lng };
+        locationFixed = (addressLevel === 'banchi');
+        setGeoStatus('');
+        syncPosition();
+        return;
+      }
+
       setGeoStatus('');
       items.forEach(function (it) {
         var li = document.createElement('li');
         li.textContent = it.label;
         li.addEventListener('click', function () {
           position = { lat: it.lat, lng: it.lng };
+          // 自分で候補を選んだのだから、確かめたものとして扱う
+          locationFixed = true;
           form().address.value = it.label;
           box.hidden = true;
           syncPosition();
@@ -341,37 +391,26 @@
 
   function startPicking() {
     Chintai.ui.closePanel('form-panel');
-    $('crosshair').hidden = false;
-    $('picker-bar').hidden = false;
-    Chintai.map.startPicker(position);
-  }
+    Chintai.ui.startLocationPicker(position).then(function (picked) {
+      Chintai.ui.openPanel('form-panel');
+      if (!picked) return;
 
-  function endPicking() {
-    $('crosshair').hidden = true;
-    $('picker-bar').hidden = true;
-    Chintai.map.stopPicker();
-    Chintai.ui.openPanel('form-panel');
-  }
+      position = picked;
+      // 自分で置いた位置なので確定として扱う
+      locationFixed = true;
+      syncPosition();
 
-  function cancelPicking() {
-    endPicking();
-  }
-
-  function confirmPicking() {
-    position = Chintai.map.pickedPosition();
-    endPicking();
-    syncPosition();
-
-    // 住所が空のときだけ逆引きで埋める（入力済みの住所を勝手に上書きしない）
-    if (!form().address.value.trim()) {
-      setGeoStatus('住所を取得しています…');
-      Chintai.geo.reverse(position.lat, position.lng).then(function (address) {
-        if (address && !form().address.value.trim()) form().address.value = address;
-        setGeoStatus('');
-      }).catch(function () {
-        setGeoStatus('住所は取得できませんでしたが、位置は設定されています。');
-      });
-    }
+      // 住所が空のときだけ逆引きで埋める（入力済みの住所を勝手に上書きしない）
+      if (!form().address.value.trim()) {
+        setGeoStatus('住所を取得しています…');
+        Chintai.geo.reverse(position.lat, position.lng).then(function (address) {
+          if (address && !form().address.value.trim()) form().address.value = address;
+          setGeoStatus('');
+        }).catch(function () {
+          setGeoStatus('住所は取得できませんでしたが、位置は設定されています。');
+        });
+      }
+    });
   }
 
   /* ---------- 保存・削除 ---------- */
@@ -381,6 +420,8 @@
     return {
       name: f.name.value.trim(),
       address: f.address.value.trim(),
+      addressLevel: addressLevel,
+      locationFixed: locationFixed,
       lat: position.lat,
       lng: position.lng,
       rent: M.num(f.rent.value),

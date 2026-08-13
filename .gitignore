@@ -5,3 +5,7 @@ firestore-debug.log
 ui-debug.log
 .DS_Store
 *.tgz
+
+# wrangler dev が作る一時ファイル
+.wrangler/
+.dev.vars

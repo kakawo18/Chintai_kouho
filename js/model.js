@@ -15,6 +15,23 @@
 
   var LAYOUTS = ['1R', '1K', '1DK', '1LDK', '2K', '2DK', '2LDK', '3DK', '3LDK', '4LDK以上'];
 
+  // 元のページに住所がどこまで書かれていたか。
+  // 物件サイトは番地を伏せていることが多く、そのまま地図に点で置くと
+  // 「確かめた位置」と見分けがつかなくなる。どこまで書かれていたかを持っておき、
+  // 足りないものは点ではなく範囲（半径メートル）として描くために使う。
+  var ADDRESS_LEVELS = [
+    { key: 'banchi', label: '番地まで', radius: 0 },
+    { key: 'chome', label: '丁目まで', radius: 300 },
+    { key: 'town', label: '町名まで', radius: 800 },
+    { key: 'city', label: '市区町村まで', radius: 3000 }
+  ];
+
+  var ADDRESS_LEVEL_BY_KEY = {};
+  ADDRESS_LEVELS.forEach(function (l) { ADDRESS_LEVEL_BY_KEY[l.key] = l; });
+
+  // 粒度が分からないまま未確定になった場合の半径
+  var DEFAULT_APPROX_RADIUS = 500;
+
   // 横浜〜東京のあいだを走る路線（一本で行けるかどうかは問わない）。
   // 探すエリアが変わったらこの配列を書き換えるだけで選択肢が入れ替わる。
   var LINE_GROUPS = [
@@ -65,6 +82,10 @@
       id: id,
       name: str(d.name) || '(名称未設定)',
       address: str(d.address),
+      addressLevel: ADDRESS_LEVEL_BY_KEY[d.addressLevel] ? d.addressLevel : '',
+      // 位置を人が確かめたかどうか。あとから足した項目なので、
+      // 値が無いものは確定済みとして扱う（過去の物件が一斉に「要確認」になるのを防ぐ）。
+      locationFixed: d.locationFixed !== false,
       lat: num(d.lat),
       lng: num(d.lng),
       rent: num(d.rent),
@@ -134,6 +155,30 @@
     return new Date().getFullYear() - year;
   }
 
+  /* ---------- 位置の確からしさ ---------- */
+
+  function isLocationApprox(p) {
+    return p.locationFixed === false;
+  }
+
+  function approxRadius(p) {
+    var level = ADDRESS_LEVEL_BY_KEY[p.addressLevel];
+    return (level && level.radius) ? level.radius : DEFAULT_APPROX_RADIUS;
+  }
+
+  function addressLevelLabel(key) {
+    var level = ADDRESS_LEVEL_BY_KEY[key];
+    return level ? level.label : '';
+  }
+
+  // なぜ確定していないのかを一言で伝える。原因が分かれば直しようがある。
+  function approxNote(p) {
+    var label = addressLevelLabel(p.addressLevel);
+    return label
+      ? '住所が' + label + 'しか書かれていなかったため、おおよその位置です'
+      : '位置がまだ確かめられていません';
+  }
+
   function formatYen(value) {
     if (value === null || value === undefined) return '—';
     return value.toLocaleString('ja-JP') + '円';
@@ -162,12 +207,15 @@
     layouts: [],
     minRating: 0,
     ratingWho: 'any', // 'any' | 'mine' | 'theirs'
-    statuses: ['interested', 'scheduled', 'visited'] // 「候補外」は既定で隠す
+    statuses: ['interested', 'scheduled', 'visited'], // 「候補外」は既定で隠す
+    approxOnly: false // 位置が未確定のものだけを出す（あとでまとめて直すため）
   };
 
   function filter(properties, f, uid) {
     var kw = f.keyword.trim().toLowerCase();
     return properties.filter(function (p) {
+      if (f.approxOnly && !isLocationApprox(p)) return false;
+
       if (f.statuses.length && f.statuses.indexOf(p.status) === -1) return false;
 
       if (f.maxRent !== null) {
@@ -262,6 +310,7 @@
     LAYOUTS: LAYOUTS,
     LINE_GROUPS: LINE_GROUPS,
     ALL_LINES: ALL_LINES,
+    ADDRESS_LEVELS: ADDRESS_LEVELS,
     SORTS: SORTS,
     DEFAULT_FILTER: DEFAULT_FILTER,
     statusLabel: statusLabel,
@@ -273,6 +322,10 @@
     buildingAge: buildingAge,
     ageToBuiltYear: ageToBuiltYear,
     builtYearToAge: builtYearToAge,
+    isLocationApprox: isLocationApprox,
+    approxRadius: approxRadius,
+    approxNote: approxNote,
+    addressLevelLabel: addressLevelLabel,
     formatYen: formatYen,
     formatMan: formatMan,
     ratingOf: ratingOf,

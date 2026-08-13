@@ -7,7 +7,7 @@
 
   // 端末に古い版が残っているかを利用者自身が判断できるようにするための目印。
   // 機能を足したときはここも更新する。
-  var APP_VERSION = 'v3（物件メモ／自動入力・築年数・路線の選択に対応）';
+  var APP_VERSION = 'v4（物件メモ／住所の粒度を判定し、未確定の位置を範囲で表示）';
 
   var properties = [];
   var members = {};
@@ -27,7 +27,10 @@
       members: members,
       selectedId: selectedId,
       sortKey: sortKey,
-      total: properties.length
+      total: properties.length,
+      // 件数は絞り込み前の全体で数える。絞った結果0件でも残件は残件として見せたい。
+      approxCount: properties.filter(M.isLocationApprox).length,
+      approxOnly: filter.approxOnly
     };
   }
 
@@ -129,6 +132,28 @@
       ui.toast('削除しました');
     }).catch(function (err) {
       ui.toast('削除できませんでした: ' + (err && err.message ? err.message : err));
+    });
+  }
+
+  // 詳細から直接、位置だけを直す。編集フォームを開かずに済ませる。
+  // 「あとで直せる」が本当に軽くないと、未確定のまま貯まっていくだけになるため。
+  function fixLocation(id) {
+    var p = findProperty(id);
+    if (!p) return;
+
+    Chintai.ui.startLocationPicker({ lat: p.lat, lng: p.lng }, {
+      text: '「' + p.name + '」の位置に、中央の十字を合わせてください'
+    }).then(function (picked) {
+      if (!picked) return;
+      return Chintai.db.updateProperty(id, {
+        lat: picked.lat,
+        lng: picked.lng,
+        locationFixed: true
+      }).then(function () {
+        ui.toast('位置を確定しました');
+      }).catch(function (err) {
+        ui.toast('保存できませんでした: ' + (err && err.message ? err.message : err));
+      });
     });
   }
 
@@ -314,6 +339,8 @@
     var view = Chintai.session.loadViewState();
     filter = Object.assign(JSON.parse(JSON.stringify(M.DEFAULT_FILTER)), view.filter || {});
     filter.keyword = '';
+    // 「未確定だけを見る」は作業中の一時的な状態。開き直したら全件に戻す。
+    filter.approxOnly = false;
     sortKey = view.sortKey || 'newest';
 
     Chintai.map.init('map', { onSelect: selectProperty });
@@ -332,7 +359,11 @@
       },
       onSortChange: function (key) { sortKey = key; saveView(); render(); },
       onFilterPatch: patchFilter,
-      onFilterToggle: toggleFilterValue
+      onFilterToggle: toggleFilterValue,
+      onFixLocation: fixLocation,
+      onToggleApproxOnly: function () {
+        patchFilter({ approxOnly: !filter.approxOnly });
+      }
     });
 
     Chintai.form.init({
