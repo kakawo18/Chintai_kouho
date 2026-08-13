@@ -40,8 +40,13 @@
       sortSelect: $('sort-select'),
       detailView: $('detail-view'),
       toast: $('status-toast'),
-      filterBadge: $('filter-badge')
+      filterBadge: $('filter-badge'),
+      approxFilter: $('approx-filter')
     };
+
+    els.approxFilter.addEventListener('click', function () {
+      handlers.onToggleApproxOnly();
+    });
 
     M.SORTS.forEach(function (s) {
       var opt = document.createElement('option');
@@ -55,6 +60,7 @@
 
     initSheetGestures();
     initFilterPanel();
+    initPicker();
     setSnap('peek');
     window.addEventListener('resize', function () { setSnap(snap); });
     return els;
@@ -138,6 +144,42 @@
     els.handle.addEventListener('pointercancel', end);
   }
 
+  /* ---------- 位置ピッカー ---------- */
+
+  // フォームからも、詳細の「位置を確定する」からも同じものを使う。
+  // 決めた位置を Promise で返し、やめた場合は null を返す。
+  var pickerResolve = null;
+  var DEFAULT_PICKER_TEXT = '地図を動かして、中央の十字を物件の位置に合わせてください';
+
+  function initPicker() {
+    $('picker-cancel').addEventListener('click', function () { endPicker(null); });
+    $('picker-confirm').addEventListener('click', function () {
+      endPicker(Chintai.map.pickedPosition());
+    });
+  }
+
+  function startLocationPicker(initial, options) {
+    var opts = options || {};
+    $('picker-text').textContent = opts.text || DEFAULT_PICKER_TEXT;
+    $('crosshair').hidden = false;
+    $('picker-bar').hidden = false;
+    Chintai.map.startPicker(initial);
+    return new Promise(function (resolve) {
+      // 前回の呼び出しが残っていたら、やめた扱いで閉じてから始める
+      if (pickerResolve) pickerResolve(null);
+      pickerResolve = resolve;
+    });
+  }
+
+  function endPicker(position) {
+    $('crosshair').hidden = true;
+    $('picker-bar').hidden = true;
+    Chintai.map.stopPicker();
+    var resolve = pickerResolve;
+    pickerResolve = null;
+    if (resolve) resolve(position);
+  }
+
   /* ---------- 一覧 ---------- */
 
   function nameOf(uid, ctx) {
@@ -181,11 +223,18 @@
     els.sortSelect.value = ctx.sortKey;
     els.list.innerHTML = '';
 
+    // 未確定が1件も無ければ出さない。片付いたら消えるほうが、残件が意味を持つ。
+    els.approxFilter.hidden = ctx.approxCount === 0;
+    els.approxFilter.textContent = '位置 要確認 ' + ctx.approxCount + '件';
+    els.approxFilter.classList.toggle('is-on', !!ctx.approxOnly);
+
     if (!properties.length) {
       els.listEmpty.hidden = false;
       els.listEmpty.textContent = ctx.total === 0
         ? 'まだ物件がありません。右下の＋から追加してください。'
-        : '条件に合う物件がありません。絞り込みを見直してください。';
+        : ctx.approxOnly
+          ? '位置が未確定の物件はありません。'
+          : '条件に合う物件がありません。絞り込みを見直してください。';
       return;
     }
     els.listEmpty.hidden = true;
@@ -205,6 +254,7 @@
         '<span class="card__foot">' +
           '<span class="tag" style="background:' + M.statusColor(p.status) + '">' +
             escapeHtml(M.statusLabel(p.status)) + '</span>' +
+          (M.isLocationApprox(p) ? '<span class="tag tag--unsure">位置 要確認</span>' : '') +
           ratingRowsHtml(p, ctx) +
           '<span class="card__updated">' +
             (p.updatedAt ? escapeHtml(nameOf(p.updatedBy, ctx)) + ' ' + relTime(p.updatedAt) : '') +
@@ -239,6 +289,16 @@
     if (p.depositMonths !== null) deposit.push('敷金 ' + p.depositMonths + 'ヶ月');
     if (p.keyMoneyMonths !== null) deposit.push('礼金 ' + p.keyMoneyMonths + 'ヶ月');
 
+    // 未確定のまま置いておけるが、直す入口は常に見えているようにする
+    var approxBox = M.isLocationApprox(p)
+      ? '<div class="approx-box">' +
+          '<p class="approx-box__text">' + escapeHtml(M.approxNote(p)) + '。' +
+            '地図の円のどこかにあります。</p>' +
+          '<button class="btn btn--primary btn--sm" type="button" id="detail-fix-location">' +
+            '地図で位置を確定する</button>' +
+        '</div>'
+      : '';
+
     els.detailView.innerHTML =
       '<div class="detail__head">' +
         '<h2 class="detail__title">' + escapeHtml(p.name) + '</h2>' +
@@ -250,6 +310,7 @@
         (p.createdBy ? '追加：' + escapeHtml(nameOf(p.createdBy, ctx)) : '') +
         (p.updatedAt ? '　最終更新：' + escapeHtml(nameOf(p.updatedBy, ctx)) + ' ' + relTime(p.updatedAt) : '') +
       '</p>' +
+      approxBox +
       images +
       '<div class="field"><span class="field__label">あなたの評価</span>' +
         '<div class="stars stars--input" id="detail-rating"></div></div>' +
@@ -268,7 +329,11 @@
           (p.walkMin !== null ? ' 徒歩' + p.walkMin + '分' : '')) +
         specRow('通勤時間', p.commuteMin === null ? '' : p.commuteMin + '分' +
           (p.commuteNote ? '（' + escapeHtml(p.commuteNote) + '）' : '')) +
-        specRow('住所', escapeHtml(p.address)) +
+        specRow('住所', escapeHtml(p.address) +
+          (M.isLocationApprox(p) && M.addressLevelLabel(p.addressLevel)
+            ? '<br><span class="hint">ページには' +
+              escapeHtml(M.addressLevelLabel(p.addressLevel)) + 'しか書かれていませんでした</span>'
+            : '')) +
         specRow('物件ページ', p.url ? '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">開く</a>' : '') +
         specRow('メモ', p.memo ? escapeHtml(p.memo).replace(/\n/g, '<br>') : '') +
       '</table>' +
@@ -291,6 +356,11 @@
 
     $('detail-back').addEventListener('click', showList);
     $('detail-edit').addEventListener('click', function () { handlers.onEdit(p.id); });
+    if ($('detail-fix-location')) {
+      $('detail-fix-location').addEventListener('click', function () {
+        handlers.onFixLocation(p.id);
+      });
+    }
     $('comment-send').addEventListener('click', sendComment);
     $('comment-input').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') sendComment();
@@ -456,6 +526,7 @@
     setSnap: setSnap,
     currentSnap: currentSnap,
     renderList: renderList,
+    startLocationPicker: startLocationPicker,
     showDetail: showDetail,
     showList: showList,
     isDetailOpen: isDetailOpen,

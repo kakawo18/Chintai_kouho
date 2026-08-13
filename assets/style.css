@@ -5,6 +5,10 @@
   --line: #e3e6ea;
   --accent: #2f6fd0;
   --danger: #c0392b;
+  /* 位置が確かめられていないことを示す色。ステータスの4色ともボタンの青とも
+     重ならない色にして、「手を入れるべきもの」だけが目に入るようにする。 */
+  --unsure: #b56a12;
+  --unsure-bg: #fdf3e3;
   --sheet-radius: 16px;
   --topbar-h: 56px;
   --sheet-h: 88dvh;
@@ -69,6 +73,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transform: scale(1.15);
   box-shadow: 0 0 0 4px rgba(47, 111, 208, .3), 0 2px 6px rgba(0, 0, 0, .35);
   z-index: 10;
+}
+
+/* 位置が未確定のピン。ステータスの色は残したまま、隅に印を足して見分ける。
+   色そのものを変えると、ステータスの色分けが読めなくなるため。 */
+.pin__flag {
+  position: absolute; top: -7px; right: -7px;
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--unsure); color: #fff;
+  border: 2px solid #fff; border-radius: 50%;
+  font-size: 10px; font-weight: 700; line-height: 1;
 }
 
 .crosshair {
@@ -198,6 +213,16 @@ body.is-picking .topbar { display: none; }
   gap: 10px; padding-bottom: 8px;
 }
 .list-toolbar__count { font-size: 13px; color: var(--muted); }
+
+/* 位置が未確定の件数。押すとその物件だけに絞れる。 */
+.flag-pill {
+  margin-right: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--unsure); border-radius: 14px;
+  background: var(--unsure-bg); color: var(--unsure);
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.flag-pill.is-on { background: var(--unsure); color: #fff; }
 .list-toolbar__sort select {
   height: 32px; padding: 0 8px;
   border: 1px solid var(--line); border-radius: 8px; background: #fff;
@@ -301,6 +326,31 @@ body.is-picking .topbar { display: none; }
 .cost-preview {
   margin: 0; padding: 10px 12px;
   background: #f5f7fa; border-radius: 10px; font-size: 13px;
+}
+
+/* ---------- 位置が未確定であることの表示 ---------- */
+
+.approx {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--unsure); border-radius: 10px;
+  background: var(--unsure-bg);
+}
+.approx__text { margin: 0; font-size: 12.5px; color: var(--unsure); }
+
+.approx-box {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  padding: 12px; margin-bottom: 12px;
+  border: 1px solid var(--unsure); border-radius: 10px;
+  background: var(--unsure-bg);
+}
+.approx-box__text { margin: 0; font-size: 13px; color: var(--unsure); }
+
+/* カードの「位置 要確認」。ステータスのタグと形を変えて、別の意味だと分かるようにする */
+.tag--unsure {
+  background: var(--unsure-bg);
+  color: var(--unsure);
+  border: 1px solid currentColor;
 }
 
 .autofill {

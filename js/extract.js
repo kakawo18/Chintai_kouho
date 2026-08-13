@@ -5,6 +5,20 @@
 
   var M = Chintai.model;
 
+  var ADDRESS_LEVELS = ['banchi', 'chome', 'town', 'city'];
+
+  // 「1-2-3」「1番2号」のような番地の並びが実際にあるか。
+  // モデルが banchi と答えても、住所にその形が無ければ信用しない。
+  // 取りこぼす側（＝要確認として残る）に倒すほうが、
+  // 確かめずに済ませてしまうより安全なため。
+  function hasBanchi(address) {
+    if (!address) return false;
+    var tail = address.replace(/^.*?[都道府県]/, '');
+    return /\d+\s*[-−ー–—]\s*\d+/.test(tail) ||
+           /\d+\s*番/.test(tail) ||
+           /\d+\s*号/.test(tail);
+  }
+
   function isUrl(value) {
     return /^https?:\/\/\S+$/i.test(value.trim());
   }
@@ -64,6 +78,7 @@
     var out = {
       name: str(raw.name),
       address: str(raw.address),
+      addressLevel: ADDRESS_LEVELS.indexOf(str(raw.addressLevel)) === -1 ? '' : str(raw.addressLevel),
       rent: int(raw.rent),
       adminFee: int(raw.adminFee),
       depositMonths: num(raw.depositMonths),
@@ -81,6 +96,14 @@
       memo: str(raw.memo),
       url: sourceUrl
     };
+
+    // 住所そのものが取れていなければ、粒度も意味を持たない
+    if (!out.address) out.addressLevel = '';
+
+    // 番地まであると答えていても、住所に番地の形が無ければ一段下げる
+    if (out.addressLevel === 'banchi' && !hasBanchi(out.address)) {
+      out.addressLevel = 'chome';
+    }
 
     // 築年が明らかにおかしい値なら採用しない
     var year = new Date().getFullYear();

@@ -3,6 +3,7 @@
   'use strict';
 
   var TOKYO = [35.681236, 139.767125];
+  var UNSURE_COLOR = '#b56a12';   // style.css の --unsure と揃える
   var map = null;
   var markers = {};       // id -> L.Marker
   var layer = null;
@@ -41,9 +42,11 @@
     var total = Chintai.model.monthlyTotal(p);
     var label = total === null ? '—' : Chintai.model.formatMan(total);
     var color = Chintai.model.statusColor(p.status);
+    var approx = Chintai.model.isLocationApprox(p);
     var cls = 'pin' + (isSelected ? ' pin--selected' : '');
     var html = '<div class="' + cls + '" style="--pin-color:' + color + '">' +
       '<span class="pin__label">' + escapeHtml(label) + '</span>' +
+      (approx ? '<span class="pin__flag" title="位置が未確定です">?</span>' : '') +
       '<span class="pin__tail"></span>' +
       '</div>';
     return L.divIcon({
@@ -68,11 +71,28 @@
 
     properties.forEach(function (p) {
       if (p.lat === null || p.lng === null) return;
+      var isSelected = p.id === selectedId;
+      var select = function () { onSelect(p.id); };
+
+      // 位置が未確定なら、点ではなく範囲で描く。
+      // 番地の分からない住所を1点で示すと、確かめた位置と見分けがつかなくなる。
+      // 「このあたり」と正直に出しておけば、直すべきものが一目で分かる。
+      if (Chintai.model.isLocationApprox(p)) {
+        L.circle([p.lat, p.lng], {
+          radius: Chintai.model.approxRadius(p),
+          color: UNSURE_COLOR,
+          weight: 2,
+          dashArray: '6 5',
+          fillColor: UNSURE_COLOR,
+          fillOpacity: isSelected ? 0.20 : 0.10
+        }).on('click', select).addTo(layer);
+      }
+
       var marker = L.marker([p.lat, p.lng], {
-        icon: buildIcon(p, p.id === selectedId),
-        zIndexOffset: p.id === selectedId ? 1000 : 0
+        icon: buildIcon(p, isSelected),
+        zIndexOffset: isSelected ? 1000 : 0
       });
-      marker.on('click', function () { onSelect(p.id); });
+      marker.on('click', select);
       marker.addTo(layer);
       markers[p.id] = marker;
     });

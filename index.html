@@ -29,7 +29,7 @@
 </header>
 
 <div id="picker-bar" class="picker-bar" hidden>
-  <p class="picker-bar__text">地図を動かして、中央の十字を物件の位置に合わせてください</p>
+  <p id="picker-text" class="picker-bar__text">地図を動かして、中央の十字を物件の位置に合わせてください</p>
   <div class="picker-bar__actions">
     <button id="picker-cancel" class="btn btn--ghost" type="button">やめる</button>
     <button id="picker-confirm" class="btn btn--primary" type="button">この位置に決定</button>
@@ -50,6 +50,8 @@
     <div id="list-view">
       <div class="list-toolbar">
         <span id="list-count" class="list-toolbar__count">0件</span>
+        <!-- 位置が未確定の物件をまとめて片付けるための入口 -->
+        <button id="approx-filter" class="flag-pill" type="button" hidden></button>
         <label class="list-toolbar__sort">
           <span class="sr-only">並べ替え</span>
           <select id="sort-select"></select>
@@ -94,6 +96,13 @@
       <div class="row">
         <button id="btn-pick-on-map" class="btn btn--ghost btn--sm" type="button">地図で位置を指定</button>
         <span id="latlng-view" class="hint hint--inline">未設定</span>
+      </div>
+      <!-- 住所に番地が無かった場合に出る。位置が「おおよそ」であることを隠さない -->
+      <div id="location-approx" class="approx" hidden>
+        <p id="location-approx-text" class="approx__text"></p>
+        <button id="btn-confirm-location" class="btn btn--ghost btn--sm" type="button">
+          この位置で確定する
+        </button>
       </div>
     </fieldset>
 

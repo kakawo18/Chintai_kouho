@@ -24,7 +24,18 @@ const PROPERTY_SCHEMA = {
   type: 'object',
   properties: {
     name: { type: ['string', 'null'], description: '物件名。号室が分かれば含める' },
-    address: { type: ['string', 'null'], description: '所在地。都道府県から' },
+    address: {
+      type: ['string', 'null'],
+      description: 'ページに書かれている所在地を、書かれているとおりに。都道府県から。書かれていない番地・号を補わない'
+    },
+    // 許可する値は description で示し、enum は使わない。
+    // strict なスキーマ検証で弾かれると自動入力ごと失敗するため、
+    // 想定外の値はアプリ側（js/extract.js）で捨てる方針にしている。
+    addressLevel: {
+      type: ['string', 'null'],
+      description: 'address がどこまで書かれていたか。banchi（番地・号まで）/ chome（丁目まで）/ ' +
+                   'town（町名まで）/ city（市区町村まで）のいずれか1語。address が null なら null'
+    },
     rent: { type: ['integer', 'null'], description: '家賃（円/月）。万円表記は円に直す' },
     adminFee: { type: ['integer', 'null'], description: '管理費・共益費（円/月）' },
     depositMonths: { type: ['number', 'null'], description: '敷金（ヶ月）。円表記なら家賃で割る。なしは0' },
@@ -39,9 +50,9 @@ const PROPERTY_SCHEMA = {
     imageUrls: { type: 'array', items: { type: 'string' }, description: '間取り図や室内写真の画像URL。最大3件' },
     memo: { type: ['string', 'null'], description: '設備や条件の要点を一行で' }
   },
-  required: ['name', 'address', 'rent', 'adminFee', 'depositMonths', 'keyMoneyMonths',
-             'layout', 'areaSqm', 'builtYear', 'floor', 'line', 'station', 'walkMin',
-             'imageUrls', 'memo'],
+  required: ['name', 'address', 'addressLevel', 'rent', 'adminFee', 'depositMonths',
+             'keyMoneyMonths', 'layout', 'areaSqm', 'builtYear', 'floor', 'line',
+             'station', 'walkMin', 'imageUrls', 'memo'],
   additionalProperties: false
 };
 
@@ -129,7 +140,18 @@ async function callKimi(env, sourceText) {
           '読み取れなかった項目は必ず null にする。推測で埋めない。\n' +
           '金額は円の整数にする（8.5万円→85000）。敷金・礼金は家賃に対するヶ月数で返し、' +
           '「なし」「0円」と書かれていれば 0 にする。\n' +
-          '築年は西暦4桁で返す。「築12年」のような表記しかない場合は今年から引いて求める。'
+          '築年は西暦4桁で返す。「築12年」のような表記しかない場合は今年から引いて求める。\n' +
+          '\n' +
+          '住所について（重要）:\n' +
+          '賃貸物件のページは番地や号を伏せていることが多い。書かれていない番地・号を' +
+          '絶対に補ってはならない。近隣の建物や地図の説明から番地を推し量ることもしない。\n' +
+          'address はページに書かれているところまでを、そのまま入れる。\n' +
+          'addressLevel には、その address がどこまで書かれていたかを入れる。\n' +
+          '  「神奈川県横浜市西区北幸2-1-5」→ banchi\n' +
+          '  「神奈川県横浜市西区北幸2丁目」→ chome\n' +
+          '  「神奈川県横浜市西区北幸」→ town\n' +
+          '  「神奈川県横浜市西区」→ city\n' +
+          '欠けている部分は欠けたまま返すのが正しい。'
       },
       { role: 'user', content: sourceText }
     ],
