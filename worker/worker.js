@@ -59,6 +59,13 @@ const PROPERTY_SCHEMA = {
     keyMoneyMonths: { type: ['number', 'null'], description: '礼金（ヶ月）。円表記なら家賃で割る。なしは0' },
     layout: { type: ['string', 'null'], description: '間取り。例 1LDK' },
     areaSqm: { type: ['number', 'null'], description: '専有面積（㎡）' },
+    // addressLevel と同じ理由で enum は使わない。表記のゆれはアプリ側で正式な言い方に寄せる。
+    structure: {
+      type: ['string', 'null'],
+      description: '建物構造。木造 / 軽量鉄骨造 / 鉄骨造 / 鉄筋コンクリート造 / ' +
+                   '鉄骨鉄筋コンクリート造 のいずれかで返す。RC造→鉄筋コンクリート造、' +
+                   'SRC造→鉄骨鉄筋コンクリート造。どれにも当てはまらなければ書かれているまま'
+    },
     builtYear: { type: ['integer', 'null'], description: '築年（西暦4桁）。築◯年としか書かれていなければ今年から引いて求める' },
     floor: { type: ['integer', 'null'], description: '所在階' },
     line: { type: ['string', 'null'], description: '最寄駅の路線名' },
@@ -68,8 +75,8 @@ const PROPERTY_SCHEMA = {
     memo: { type: ['string', 'null'], description: '設備や条件の要点を一行で' }
   },
   required: ['name', 'address', 'addressLevel', 'rent', 'adminFee', 'depositMonths',
-             'keyMoneyMonths', 'layout', 'areaSqm', 'builtYear', 'floor', 'line',
-             'station', 'walkMin', 'imageUrls', 'memo'],
+             'keyMoneyMonths', 'layout', 'areaSqm', 'structure', 'builtYear', 'floor',
+             'line', 'station', 'walkMin', 'imageUrls', 'memo'],
   additionalProperties: false
 };
 

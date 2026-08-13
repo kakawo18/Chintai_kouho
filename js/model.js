@@ -29,6 +29,20 @@
 
   var LAYOUTS = ['1R', '1K', '1DK', '1LDK', '2K', '2DK', '2LDK', '3DK', '3LDK', '4LDK以上'];
 
+  // 建物の構造。隣の音の伝わりやすさ・冬の寒さ・地震のときの揺れが変わるので、
+  // 家賃と同じくらい後悔に効く項目。並べて比べられるように選択式で持つ。
+  // 一覧の1行に収まらないため、短い言い方も一緒に持っておく。
+  var STRUCTURES = [
+    { key: '木造', short: '木造' },
+    { key: '軽量鉄骨造', short: '軽量鉄骨' },
+    { key: '鉄骨造', short: '鉄骨' },
+    { key: '鉄筋コンクリート造', short: 'RC' },
+    { key: '鉄骨鉄筋コンクリート造', short: 'SRC' }
+  ];
+
+  var STRUCTURE_BY_KEY = {};
+  STRUCTURES.forEach(function (s) { STRUCTURE_BY_KEY[s.key] = s; });
+
   // 元のページに住所がどこまで書かれていたか。
   // 物件サイトは番地を伏せていることが多く、そのまま地図に点で置くと
   // 「確かめた位置」と見分けがつかなくなる。どこまで書かれていたかを持っておき、
@@ -78,6 +92,35 @@
     return (STATUS_BY_KEY[key] || STATUS_BY_KEY.interested).color;
   }
 
+  // 構造の書き方はページごとに違う（RC造／鉄筋コン／木造アパート…）。
+  // 選択肢に載っている言い方へ寄せ、当てはまらないものは書かれたまま残す。
+  // 「捨てずに残す」のは、ALC造や壁式PC造のような珍しい構造を失わないため。
+  function normalizeStructure(value) {
+    var s = String(value || '').replace(/\s+/g, '');
+    if (!s) return '';
+    // 全角の英字も同じに扱う（ＲＣ造 と RC造 を分けない）
+    var upper = s.toUpperCase().replace(/[Ａ-Ｚ]/g, function (c) {
+      return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+    });
+
+    // 長い言い方から先に見る。「鉄骨鉄筋」を「鉄骨」と取り違えないため。
+    if (upper.indexOf('SRC') !== -1 || s.indexOf('鉄骨鉄筋') !== -1) return '鉄骨鉄筋コンクリート造';
+    if (upper.indexOf('RC') !== -1 || s.indexOf('鉄筋コン') !== -1) return '鉄筋コンクリート造';
+    if (s.indexOf('軽量鉄骨') !== -1 || /軽量S/.test(upper)) return '軽量鉄骨造';
+    // 「S造」も鉄骨造の略。ただし S の一文字だけを見ると別の構造まで巻き込むので、
+    // 丸ごと S造 と書かれている場合に限る。
+    if (s.indexOf('鉄骨') !== -1 || /^S造?$/.test(upper)) return '鉄骨造';
+    if (s.indexOf('木') !== -1) return '木造';
+    return s;
+  }
+
+  // 一覧のように横幅が限られる場所で使う短い言い方。
+  // 選択肢に無い構造は縮めようがないので、書かれたまま出す。
+  function structureShort(value) {
+    var hit = STRUCTURE_BY_KEY[value];
+    return hit ? hit.short : (value || '');
+  }
+
   // 数値欄は空文字を null として保持する（0 と「未入力」を区別するため）
   function num(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -108,6 +151,9 @@
       keyMoneyMonths: num(d.keyMoneyMonths),
       layout: str(d.layout),
       areaSqm: num(d.areaSqm),
+      // 表記のゆれを読み込みの時点で吸収する。書き出した JSON を読み直したときも、
+      // 相手の端末から届いたときも、同じ言い方に揃う。
+      structure: normalizeStructure(d.structure),
       builtYear: num(d.builtYear),
       floor: num(d.floor),
       line: str(d.line),
@@ -257,7 +303,7 @@
       }
 
       if (kw) {
-        var hay = [p.name, p.address, p.station, p.line, p.memo].join(' ').toLowerCase();
+        var hay = [p.name, p.address, p.station, p.line, p.structure, p.memo].join(' ').toLowerCase();
         if (hay.indexOf(kw) === -1) return false;
       }
 
@@ -324,6 +370,7 @@
   Chintai.model = {
     STATUSES: STATUSES,
     LAYOUTS: LAYOUTS,
+    STRUCTURES: STRUCTURES,
     LINE_GROUPS: LINE_GROUPS,
     ALL_LINES: ALL_LINES,
     ADDRESS_LEVELS: ADDRESS_LEVELS,
@@ -331,6 +378,8 @@
     DEFAULT_FILTER: DEFAULT_FILTER,
     statusLabel: statusLabel,
     statusColor: statusColor,
+    normalizeStructure: normalizeStructure,
+    structureShort: structureShort,
     normalize: normalize,
     num: num,
     monthlyTotal: monthlyTotal,

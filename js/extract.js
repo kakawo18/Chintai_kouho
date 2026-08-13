@@ -93,6 +93,8 @@
       keyMoneyMonths: num(raw.keyMoneyMonths),
       layout: str(raw.layout),
       areaSqm: num(raw.areaSqm),
+      // ページの書き方（RC造・鉄筋コン・木造アパート…）を選択肢の言い方に寄せる
+      structure: M.normalizeStructure(str(raw.structure)),
       builtYear: int(raw.builtYear),
       floor: int(raw.floor),
       line: str(raw.line),

@@ -12,6 +12,7 @@
   var status = 'interested';
   var searchTimer = null;
   var OTHER_LINE = '__other__';
+  var OTHER_STRUCTURE = '__other__';
 
   function $(id) { return document.getElementById(id); }
   function form() { return $('form'); }
@@ -31,6 +32,13 @@
       syncLineOther();
       if (!$('line-other').hidden) $('line-other').focus();
     });
+
+    buildStructureSelect();
+    $('structure-select').addEventListener('change', function () {
+      syncStructureOther();
+      if (!$('structure-other').hidden) $('structure-other').focus();
+    });
+
     form().buildingAge.addEventListener('input', syncBuiltYearHint);
 
     var seg = $('status-seg');
@@ -93,6 +101,7 @@
       var age = M.builtYearToAge(current.builtYear);
       f.buildingAge.value = age === null ? '' : String(age);
       setLine(current.line);
+      setStructure(current.structure);
       f.imageUrls.value = current.imageUrls.join('\n');
       position = { lat: current.lat, lng: current.lng };
       addressLevel = current.addressLevel;
@@ -108,6 +117,7 @@
       status = 'interested';
       rating = 0;
       setLine('');
+      setStructure('');
     }
 
     syncBuiltYearHint();
@@ -172,6 +182,55 @@
 
   function syncLineOther() {
     $('line-other').hidden = $('line-select').value !== OTHER_LINE;
+  }
+
+  // 構造も路線と同じつくり。よくある5つを選択式にして、
+  // ALC造のような珍しいものは「その他」で書けるようにしておく。
+  function buildStructureSelect() {
+    var sel = $('structure-select');
+    sel.innerHTML = '';
+
+    var blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '（未選択）';
+    sel.appendChild(blank);
+
+    M.STRUCTURES.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.key;
+      opt.textContent = s.key;
+      sel.appendChild(opt);
+    });
+
+    var other = document.createElement('option');
+    other.value = OTHER_STRUCTURE;
+    other.textContent = 'その他（自由入力）';
+    sel.appendChild(other);
+  }
+
+  // 「RC造」のような表記で保存されていても選択肢に合わせて表示する。
+  // それでも当てはまらないものは「その他」に入れて元の文字列を残す。
+  function setStructure(value) {
+    var sel = $('structure-select');
+    var known = M.normalizeStructure(value);
+    var listed = M.STRUCTURES.some(function (s) { return s.key === known; });
+    if (known && !listed) {
+      sel.value = OTHER_STRUCTURE;
+      $('structure-other').value = known;
+    } else {
+      sel.value = known;
+      $('structure-other').value = '';
+    }
+    syncStructureOther();
+  }
+
+  function syncStructureOther() {
+    $('structure-other').hidden = $('structure-select').value !== OTHER_STRUCTURE;
+  }
+
+  function currentStructureValue() {
+    var sel = $('structure-select');
+    return sel.value === OTHER_STRUCTURE ? $('structure-other').value.trim() : sel.value;
   }
 
   // 入力された築年数が西暦の何年にあたるかをその場に出し、取り違えに気づけるようにする
@@ -262,7 +321,7 @@
   var AUTOFILL_LABELS = {
     name: '物件名', address: '住所', rent: '家賃', adminFee: '管理費',
     depositMonths: '敷金', keyMoneyMonths: '礼金', layout: '間取り',
-    areaSqm: '面積', builtYear: '築年数', floor: '階', line: '路線',
+    areaSqm: '面積', structure: '構造', builtYear: '築年数', floor: '階', line: '路線',
     station: '最寄駅', walkMin: '徒歩分', imageUrls: '画像', memo: 'メモ', url: '物件URL'
   };
 
@@ -294,6 +353,11 @@
     if (data.line && !currentLineValue()) {
       setLine(data.line);
       filled.push(AUTOFILL_LABELS.line);
+    }
+
+    if (data.structure && !currentStructureValue()) {
+      setStructure(data.structure);
+      filled.push(AUTOFILL_LABELS.structure);
     }
 
     if (data.imageUrls.length && !f.imageUrls.value.trim()) {
@@ -456,6 +520,7 @@
       keyMoneyMonths: M.num(f.keyMoneyMonths.value),
       layout: f.layout.value.trim(),
       areaSqm: M.num(f.areaSqm.value),
+      structure: M.normalizeStructure(currentStructureValue()),
       builtYear: M.ageToBuiltYear(M.num(f.buildingAge.value)),
       floor: M.num(f.floor.value),
       line: $('line-select').value === OTHER_LINE

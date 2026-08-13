@@ -213,6 +213,8 @@
     var parts = [];
     if (p.layout) parts.push(p.layout);
     if (p.areaSqm !== null) parts.push(p.areaSqm + '㎡');
+    // 1行に収めたいので短い言い方（RC / SRC など）を使う
+    if (p.structure) parts.push(M.structureShort(p.structure));
     if (p.station) parts.push(p.station + '駅' + (p.walkMin !== null ? ' 徒歩' + p.walkMin + '分' : ''));
     if (p.address && !parts.length) parts.push(p.address);
     return parts.join(' ・ ');
@@ -323,6 +325,7 @@
         specRow('初期費用の目安', initial === null ? '' : M.formatYen(initial)) +
         specRow('間取り', escapeHtml(p.layout)) +
         specRow('面積', p.areaSqm === null ? '' : p.areaSqm + '㎡') +
+        specRow('構造', escapeHtml(p.structure)) +
         specRow('築年数', age === null ? '' : age + '年（' + p.builtYear + '年築）') +
         specRow('階', p.floor === null ? '' : p.floor + '階') +
         specRow('最寄駅', escapeHtml([p.line, p.station].filter(Boolean).join(' ')) +
