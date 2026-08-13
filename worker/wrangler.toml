@@ -12,6 +12,12 @@ ALLOWED_ORIGIN = "https://kakawo18.github.io"
 # platform.kimi.ai    なら https://api.kimi.ai/v1
 KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 
+# 使うモデル。決まった項目を抜き出すだけなので最上位のモデルは要りません。
+#   kimi-k2.6 … 既定。汎用。入力 $0.95 / 出力 $4（100万トークンあたり）
+#   kimi-k3   … 最上位。入力 $3 / 出力 $15。読み取りの精度が足りないときだけ
+# ここを書き換えて npx wrangler deploy し直すか、Cloudflare の画面で変えられます。
+KIMI_MODEL = "kimi-k2.6"
+
 # KIMI_API_KEY と APP_PASSPHRASE はここに書かないこと。
 # 必ず Secret として登録します:
 #   npx wrangler secret put KIMI_API_KEY
