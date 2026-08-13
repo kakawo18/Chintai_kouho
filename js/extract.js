@@ -50,12 +50,12 @@
       if (!res.ok) throw new Error('中継サーバーに接続できませんでした (' + res.status + ')');
       return res.json();
     }).then(function (data) {
-      if (data.error) throw new Error(messageFor(data.error, data.status));
+      if (data.error) throw new Error(messageFor(data.error, data.status, data.detail));
       return normalize(data.property || {}, isUrl(value) ? value : '');
     });
   }
 
-  function messageFor(code, status) {
+  function messageFor(code, status, detail) {
     switch (code) {
       case 'fetch_failed':
         return 'ページを取得できませんでした（' + (status || '応答なし') +
@@ -67,9 +67,12 @@
         // モデル名を変えた直後は 404 / 400 が返る。原因が分かる形で出す。
         if (status === 404 || status === 400) {
           return '抽出に失敗しました（' + status + '）。' +
-            '中継サーバーの KIMI_MODEL に指定したモデル名を確認してください。';
+            '中継サーバーの KIMI_MODEL に指定したモデル名を確認してください。' +
+            (detail ? '［' + detail + '］' : '');
         }
-        return '抽出に失敗しました（' + (status || '') + '）。';
+        // 番号だけでは何も分からないので、中継サーバーが掴んだ理由をそのまま出す
+        return '抽出に失敗しました（' + (status || '') + '）。' +
+          (detail ? '［' + detail + '］' : 'もう一度お試しください。');
       case 'server_not_configured':
         return '中継サーバーの設定が未完了です（APIキーか合言葉が未登録）。';
       default:
