@@ -138,7 +138,10 @@ async function callKimi(env, sourceText) {
 
   const body = {
     model: env.KIMI_MODEL || DEFAULT_MODEL,
-    max_tokens: 2000,
+    // 出力そのものは1000トークンも要らないが、考えてから答えるモデルでは
+    // その過程もこの上限に含まれる。2000 だと考えている途中で打ち切られ、
+    // 本文が空のまま返ってくることがあるため余裕をもたせている。
+    max_tokens: 8000,
     messages: [
       {
         role: 'system',
@@ -179,17 +182,75 @@ async function callKimi(env, sourceText) {
 
   const raw = await res.text();
   if (!res.ok) {
-    return { ok: false, status: res.status, detail: raw.slice(0, 400) };
+    return { ok: false, status: res.status, detail: 'APIがエラーを返しました: ' + raw.slice(0, 300) };
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch (e) {
+    return { ok: false, status: 502, detail: '応答がJSONではありません: ' + raw.slice(0, 200) };
+  }
+
+  const choice = payload.choices && payload.choices[0];
+  if (!choice) {
+    return { ok: false, status: 502, detail: 'choices が空です: ' + raw.slice(0, 200) };
+  }
+
+  const content = readContent(choice.message);
+  if (!content) {
+    // 本文が空になるのは、考える過程で max_tokens を使い切った場合が多い。
+    // finish_reason を返して、切り詰めなのか別の理由なのかを見分けられるようにする。
+    return {
+      ok: false,
+      status: 502,
+      detail: '本文が空です（finish_reason: ' + (choice.finish_reason || '不明') + '）'
+    };
   }
 
   let parsed;
   try {
-    const payload = JSON.parse(raw);
-    parsed = JSON.parse(payload.choices[0].message.content);
+    parsed = JSON.parse(stripToJson(content));
   } catch (e) {
-    return { ok: false, status: 502, detail: '応答を解釈できませんでした' };
+    return { ok: false, status: 502, detail: 'JSONとして読めません: ' + content.slice(0, 200) };
   }
   return { ok: true, property: parsed };
+}
+
+// content の形はモデルによって違う。文字列のこともあれば、
+// 画像も扱えるモデルでは [{ type:'text', text:'...' }] の配列で返ることもある。
+// 考える過程を分けて返すモデルでは reasoning_content 側にしか入らないこともある。
+function readContent(message) {
+  if (!message) return '';
+  const c = message.content;
+  if (typeof c === 'string' && c.trim()) return c;
+  if (Array.isArray(c)) {
+    const joined = c.map(function (part) {
+      if (typeof part === 'string') return part;
+      return (part && (part.text || part.content)) || '';
+    }).join('').trim();
+    if (joined) return joined;
+  }
+  if (typeof message.reasoning_content === 'string' && message.reasoning_content.trim()) {
+    return message.reasoning_content;
+  }
+  return '';
+}
+
+// ```json ... ``` で包まれたり、前後に説明文が付いたりして返ることがある。
+// スキーマを指定していても、モデルによっては起こる。
+function stripToJson(text) {
+  let s = text.trim();
+
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+
+  if (s.charAt(0) !== '{') {
+    const start = s.indexOf('{');
+    const end = s.lastIndexOf('}');
+    if (start !== -1 && end > start) s = s.slice(start, end + 1);
+  }
+  return s;
 }
 
 export default {
