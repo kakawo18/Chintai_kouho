@@ -18,6 +18,13 @@ KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 # ここを書き換えて npx wrangler deploy し直すか、Cloudflare の画面で変えられます。
 KIMI_MODEL = "kimi-k2.6"
 
+# 考えてから答えるモデルでは、考える過程のトークンも下の上限に含まれ、
+# そのぶん出力として課金されます。決まった項目を抜き出すだけなので思考は切ります。
+# 切らないと、考えている途中で打ち切られて答えが途中で切れます。
+# このモデルは思考が要る、と分かったときは disabled 以外を入れてください。
+KIMI_THINKING = "disabled"
+KIMI_MAX_TOKENS = "16000"
+
 # KIMI_API_KEY と APP_PASSPHRASE はここに書かないこと。
 # 必ず Secret として登録します:
 #   npx wrangler secret put KIMI_API_KEY

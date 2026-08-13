@@ -12,6 +12,8 @@
 //   ALLOWED_ORIGIN … 許可するアプリの配信元。例: https://kakawo18.github.io
 //   KIMI_BASE_URL  … 省略時 https://api.moonshot.ai/v1
 //   KIMI_MODEL     … 使うモデル。省略時 kimi-k2.6
+//   KIMI_THINKING  … 'disabled'（既定）で思考を切る。他の値を入れると指定自体を送らない
+//   KIMI_MAX_TOKENS… 応答の上限。省略時 16000
 
 const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
 
@@ -21,6 +23,14 @@ const DEFAULT_BASE_URL = 'https://api.moonshot.ai/v1';
 // 変えたくなったら wrangler.toml か Cloudflare の画面で KIMI_MODEL を書き換える。
 // コードを触る必要はない。
 const DEFAULT_MODEL = 'kimi-k2.6';
+
+// 考えてから答えるモデルでは、考える過程（reasoning_content）のトークンも
+// この上限に含まれる。決まった項目を抜き出すだけの仕事に深い思考は要らないので
+// 既定では思考を切っている。切らないと2つ困ることが起きる。
+//   1. 考えている途中で上限に当たり、答えが途中で切れる
+//   2. 思考も出力として課金されるため、安いモデルに替えた意味がなくなる
+// 上限は、思考を有効にしたときでも足りるよう Kimi の推奨値に合わせてある。
+const DEFAULT_MAX_TOKENS = 16000;
 
 // 取り込むページ本文の上限。長すぎるページで料金と時間が膨らむのを防ぐ。
 const MAX_PAGE_CHARS = 60000;
@@ -138,10 +148,7 @@ async function callKimi(env, sourceText) {
 
   const body = {
     model: env.KIMI_MODEL || DEFAULT_MODEL,
-    // 出力そのものは1000トークンも要らないが、考えてから答えるモデルでは
-    // その過程もこの上限に含まれる。2000 だと考えている途中で打ち切られ、
-    // 本文が空のまま返ってくることがあるため余裕をもたせている。
-    max_tokens: 8000,
+    max_tokens: Number(env.KIMI_MAX_TOKENS) || DEFAULT_MAX_TOKENS,
     messages: [
       {
         role: 'system',
@@ -170,6 +177,12 @@ async function callKimi(env, sourceText) {
       json_schema: { name: 'rental_property', strict: true, schema: PROPERTY_SCHEMA }
     }
   };
+
+  // 思考を切る。KIMI_THINKING に 'disabled' 以外を入れると指定自体を送らず、
+  // API の既定に従う（このモデルは思考が要る、と分かったときの逃げ道）。
+  if ((env.KIMI_THINKING || 'disabled') === 'disabled') {
+    body.thinking = { type: 'disabled' };
+  }
 
   const res = await fetch((env.KIMI_BASE_URL || DEFAULT_BASE_URL) + '/chat/completions', {
     method: 'POST',
@@ -212,7 +225,20 @@ async function callKimi(env, sourceText) {
   try {
     parsed = JSON.parse(stripToJson(content));
   } catch (e) {
-    return { ok: false, status: 502, detail: 'JSONとして読めません: ' + content.slice(0, 200) };
+    // 途中で切れたのか、そもそも形が違うのかで対処が変わるので分けて伝える
+    if (choice.finish_reason === 'length') {
+      return {
+        ok: false,
+        status: 502,
+        detail: '答えが途中で切れました（max_tokens 不足）。思考を切るか KIMI_MAX_TOKENS を増やしてください'
+      };
+    }
+    return {
+      ok: false,
+      status: 502,
+      detail: 'JSONとして読めません（finish_reason: ' + (choice.finish_reason || '不明') + '）: ' +
+              content.slice(0, 200)
+    };
   }
   return { ok: true, property: parsed };
 }
