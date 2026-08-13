@@ -3,11 +3,19 @@
   --fg: #1b1f24;
   --muted: #6b7280;
   --line: #e3e6ea;
+  /* 色にはひとつずつ意味を持たせ、重ねない。
+       --accent  操作できるもの（ボタン・リンク・選択中）
+       --danger  取り消せない操作（削除）
+       --unsure  データが足りないこと（位置が未確定）
+     検討ステータスの4色は js/model.js 側で定義している。
+     どれも上の3つと色相が重ならないようにしてある。 */
   --accent: #2f6fd0;
   --danger: #c0392b;
-  /* 位置が確かめられていないことを示す色。ステータスの4色ともボタンの青とも
-     重ならない色にして、「手を入れるべきもの」だけが目に入るようにする。 */
+
+  /* 要確認。図形（地図の円・枠線）には --unsure、文字と印には濃いほうを使う。
+     薄い背景に載せたときに読める濃さが、図形として置いたときには濃すぎるため。 */
   --unsure: #b56a12;
+  --unsure-ink: #8a500d;
   --unsure-bg: #fdf3e3;
   --sheet-radius: 16px;
   --topbar-h: 56px;
@@ -81,7 +89,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: absolute; top: -7px; right: -7px;
   width: 16px; height: 16px;
   display: flex; align-items: center; justify-content: center;
-  background: var(--unsure); color: #fff;
+  background: var(--unsure-ink); color: #fff;
   border: 2px solid #fff; border-radius: 50%;
   font-size: 10px; font-weight: 700; line-height: 1;
 }
@@ -219,10 +227,10 @@ body.is-picking .topbar { display: none; }
   margin-right: auto;
   padding: 4px 10px;
   border: 1px solid var(--unsure); border-radius: 14px;
-  background: var(--unsure-bg); color: var(--unsure);
+  background: var(--unsure-bg); color: var(--unsure-ink);
   font-size: 12px; cursor: pointer; white-space: nowrap;
 }
-.flag-pill.is-on { background: var(--unsure); color: #fff; }
+.flag-pill.is-on { background: var(--unsure-ink); color: #fff; border-color: var(--unsure-ink); }
 .list-toolbar__sort select {
   height: 32px; padding: 0 8px;
   border: 1px solid var(--line); border-radius: 8px; background: #fff;
@@ -336,7 +344,7 @@ body.is-picking .topbar { display: none; }
   border: 1px solid var(--unsure); border-radius: 10px;
   background: var(--unsure-bg);
 }
-.approx__text { margin: 0; font-size: 12.5px; color: var(--unsure); }
+.approx__text { margin: 0; font-size: 12.5px; color: var(--unsure-ink); }
 
 .approx-box {
   display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
@@ -344,20 +352,23 @@ body.is-picking .topbar { display: none; }
   border: 1px solid var(--unsure); border-radius: 10px;
   background: var(--unsure-bg);
 }
-.approx-box__text { margin: 0; font-size: 13px; color: var(--unsure); }
+.approx-box__text { margin: 0; font-size: 13px; color: var(--unsure-ink); }
 
-/* カードの「位置 要確認」。ステータスのタグと形を変えて、別の意味だと分かるようにする */
+/* カードの「位置 要確認」。ステータスのタグは色で塗るので、こちらは
+   枠線と薄い背景にして、色だけでなく形でも別の意味だと分かるようにする */
 .tag--unsure {
   background: var(--unsure-bg);
-  color: var(--unsure);
-  border: 1px solid currentColor;
+  color: var(--unsure-ink);
+  border: 1px solid var(--unsure);
 }
 
+/* 囲みそのものは押せないので基調色では塗らない。
+   基調色は中の「読み取る」ボタンが持つ。 */
 .autofill {
-  padding: 12px; border: 1px dashed var(--accent); border-radius: 10px;
-  background: #f5f8fd; display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: #f6f7f9; display: flex; flex-direction: column; gap: 8px;
 }
-.autofill__title { margin: 0; font-size: 13px; font-weight: 700; color: var(--accent); }
+.autofill__title { margin: 0; font-size: 13px; font-weight: 700; }
 .autofill textarea {
   width: 100%; padding: 10px 12px; resize: vertical;
   border: 1px solid var(--line); border-radius: 10px; background: #fff;
