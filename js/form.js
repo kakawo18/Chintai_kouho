@@ -484,6 +484,12 @@
       Chintai.ui.toast('住所を選ぶか、地図で位置を指定してください');
       return;
     }
+    // 保存ボタンは type="button" なので <input type="url"> の検証は走らない。ここで見る。
+    if (data.url && !M.isHttpUrl(data.url)) {
+      Chintai.ui.toast('物件ページのURLは http:// か https:// で始まる必要があります');
+      form().url.focus();
+      return;
+    }
     handlers.onSave(current ? current.id : null, data, rating);
     close();
   }

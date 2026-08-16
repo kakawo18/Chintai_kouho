@@ -99,7 +99,7 @@
       station: str(raw.station).replace(/駅$/, ''),
       walkMin: int(raw.walkMin),
       imageUrls: Array.isArray(raw.imageUrls)
-        ? raw.imageUrls.filter(function (u) { return /^https?:\/\//i.test(u); }).slice(0, 3)
+        ? raw.imageUrls.filter(M.isHttpUrl).slice(0, 3)
         : [],
       memo: str(raw.memo),
       url: sourceUrl

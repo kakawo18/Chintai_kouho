@@ -89,6 +89,15 @@
     return typeof value === 'string' ? value.trim() : '';
   }
 
+  // href や src に入れてよいURLか。javascript: のような scheme を弾く。
+  //
+  // 値の入り口が3つある（共有相手の書き込み／JSONの読み込み／自分の手入力）ので、
+  // 入れるときだけでなく、出すときにも必ず通す。
+  // エスケープは属性からの脱出を防ぐが、scheme そのものは止められない。
+  function isHttpUrl(value) {
+    return /^https?:\/\//i.test(str(value));
+  }
+
   // Firestore から読んだ生データを、画面が前提にできる形に整える
   function normalize(id, raw) {
     var d = raw || {};
@@ -333,6 +342,7 @@
     statusColor: statusColor,
     normalize: normalize,
     num: num,
+    isHttpUrl: isHttpUrl,
     monthlyTotal: monthlyTotal,
     initialCost: initialCost,
     buildingAge: buildingAge,

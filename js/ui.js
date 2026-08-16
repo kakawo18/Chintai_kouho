@@ -334,7 +334,13 @@
             ? '<br><span class="hint">位置は' +
               escapeHtml(M.addressLevelLabel(p.addressLevel)) + 'までの精度です</span>'
             : '')) +
-        specRow('物件ページ', p.url ? '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">開く</a>' : '') +
+        // http(s) 以外はリンクにしない。javascript: を href に入れさせないため。
+        // 値は隠さず、そのままの文字として出す（消えたように見えるほうが困る）。
+        specRow('物件ページ', p.url
+          ? (M.isHttpUrl(p.url)
+              ? '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener">開く</a>'
+              : '<span class="hint">' + escapeHtml(p.url) + '</span>')
+          : '') +
         specRow('メモ', p.memo ? escapeHtml(p.memo).replace(/\n/g, '<br>') : '') +
       '</table>' +
       '<div class="detail__actions">' +
