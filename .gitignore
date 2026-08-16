@@ -9,3 +9,6 @@ ui-debug.log
 # wrangler dev が作る一時ファイル
 .wrangler/
 .dev.vars
+
+# テストが作るエミュレータの作業ファイル
+test/*-debug.log

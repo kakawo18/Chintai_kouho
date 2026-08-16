@@ -15,15 +15,102 @@ service cloud.firestore {
 
       // 共有ID（roomId）を知っている人だけがこのパスに到達できる。
       // 匿名認証を必須にして、未認証のクライアントからのアクセスを弾く。
+      //
+      // そのうえで、同じ部屋にいる相手にも「他人になりすました書き込み」は許さない。
+      // 部屋の中では読み書きも削除も自由だが、次の4点はルール側で強制する。
+      //   ・表示名を書けるのは本人だけ
+      //   ・createdBy / updatedBy / コメントの uid には自分の uid しか入れられない
+      //   ・★は自分のぶんしか書き換えられない
+      //   ・決めた項目・決めた長さしか保存できない
+      // クライアント（js/db.js）が行儀よく書いていることに頼らないための線引き。
+      function signedIn() {
+        return request.auth != null;
+      }
+
       match /members/{uid} {
-        allow read, write: if request.auth != null;
+        allow read: if signedIn();
+        // 表示名を書き換えられるのは本人だけ。
+        // ここを開けると、同じ部屋の相手の表示名を勝手に変えられてしまう。
+        allow write: if signedIn() && request.auth.uid == uid;
       }
 
       match /properties/{propertyId} {
-        allow read, write: if request.auth != null;
+
+        // 保存してよい項目。ここに無いキーが混じった書き込みは弾く。
+        // 見覚えのない大きなデータを置かれないための歯止めも兼ねている。
+        function knownKeys() {
+          return ['name', 'address', 'addressLevel', 'locationFixed', 'lat', 'lng',
+                  'rent', 'adminFee', 'depositMonths', 'keyMoneyMonths', 'layout',
+                  'areaSqm', 'builtYear', 'floor', 'line', 'station', 'walkMin',
+                  'commuteMin', 'commuteNote', 'imageUrls', 'url', 'memo', 'ratings',
+                  'status', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'];
+        }
+
+        // 文字数の上限。入力欄で現実に入りうる長さより十分に余裕を持たせてある。
+        function textOk(d) {
+          return (!('name' in d) || (d.name is string && d.name.size() <= 200))
+            && (!('address' in d) || (d.address is string && d.address.size() <= 300))
+            && (!('addressLevel' in d) || (d.addressLevel is string && d.addressLevel.size() <= 20))
+            && (!('layout' in d) || (d.layout is string && d.layout.size() <= 40))
+            && (!('line' in d) || (d.line is string && d.line.size() <= 60))
+            && (!('station' in d) || (d.station is string && d.station.size() <= 60))
+            && (!('commuteNote' in d) || (d.commuteNote is string && d.commuteNote.size() <= 200))
+            && (!('url' in d) || (d.url is string && d.url.size() <= 2000))
+            && (!('memo' in d) || (d.memo is string && d.memo.size() <= 2000))
+            && (!('status' in d) || (d.status is string && d.status.size() <= 20));
+        }
+
+        function shapeOk(d) {
+          return d.keys().hasOnly(knownKeys())
+            && textOk(d)
+            && (!('ratings' in d) || d.ratings is map)
+            && (!('imageUrls' in d) || (d.imageUrls is list && d.imageUrls.size() <= 10))
+            && (!('createdBy' in d) || (d.createdBy is string && d.createdBy.size() <= 128))
+            && (!('updatedBy' in d) || (d.updatedBy is string && d.updatedBy.size() <= 128));
+        }
+
+        // 変更してよい★は自分のぶんだけ。相手の評価は動かせない。
+        function ratingsOnlyMine() {
+          return request.resource.data.get('ratings', {})
+            .diff(resource.data.get('ratings', {}))
+            .affectedKeys().hasOnly([request.auth.uid]);
+        }
+
+        allow read: if signedIn();
+
+        // 新規作成では ratings の中身を縛っていない。
+        // JSONの読み込み（js/db.js の bulkWrite）が、書き出した時点の
+        // 二人ぶんの★をそのまま復元するため。
+        // 削除はもともと部屋の全員に許しているので、
+        // 「消して作り直す」経路まで塞いでも実効的な守りにはならない。
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.updatedBy == request.auth.uid
+          && shapeOk(request.resource.data);
+
+        // createdBy と ratings は get(キー, 既定値) で読む。
+        // 項目が増える前に保存された物件はこれらを持っておらず、
+        // 素で参照すると評価エラー（＝拒否）になって編集できなくなる。
+        allow update: if signedIn()
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+          && ratingsOnlyMine()
+          && shapeOk(request.resource.data);
+
+        allow delete: if signedIn();
 
         match /comments/{commentId} {
-          allow read, write: if request.auth != null;
+          allow read: if signedIn();
+          allow create: if signedIn()
+            && request.resource.data.keys().hasOnly(['uid', 'text', 'createdAt'])
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 200;
+          // 書いたものは編集させない（あとから中身を差し替えられないように）。
+          // 消すのは、目に余るものを片付けられるよう部屋の全員に許す。
+          allow update: if false;
+          allow delete: if signedIn();
         }
       }
     }

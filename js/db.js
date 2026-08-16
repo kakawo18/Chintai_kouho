@@ -147,38 +147,58 @@
     });
   }
 
-  // 読み込み（インポート）用。まとめ書きするが、バッチ上限に配慮して分割する
+  // 読み込み（インポート）用。まとめ書きするが、バッチ上限に配慮して分割する。
+  //
+  // 既にある物件と、これから作る物件で書き方を変えている。ルール（firestore.rules）が
+  //   ・新規作成では createdBy が自分であること
+  //   ・更新では createdBy を変えないこと、★は自分のぶんしか動かさないこと
+  // を求めるため。素直に全部を上書きすると、相手が追加した物件の読み込みで弾かれる。
   function bulkWrite(properties, mode) {
     var chunks = [];
     for (var i = 0; i < properties.length; i += 400) {
       chunks.push(properties.slice(i, i + 400));
     }
 
-    var startedAt = Promise.resolve();
-    if (mode === 'replace') {
-      startedAt = propertiesRef().get().then(function (snap) {
+    return propertiesRef().get().then(function (snap) {
+      var existing = {};
+      var startedAt = Promise.resolve();
+
+      if (mode === 'replace') {
+        // すべて消してから入れ直すので、以降はすべて新規として扱う
         var batch = db.batch();
         snap.docs.forEach(function (doc) { batch.delete(doc.ref); });
-        return batch.commit();
-      });
-    }
+        startedAt = batch.commit();
+      } else {
+        snap.docs.forEach(function (doc) { existing[doc.id] = true; });
+      }
 
-    return chunks.reduce(function (chain, chunk) {
-      return chain.then(function () {
-        var batch = db.batch();
-        chunk.forEach(function (p) {
-          var ref = p.id ? propertiesRef().doc(p.id) : propertiesRef().doc();
-          var payload = Object.assign({}, p);
-          delete payload.id;
-          payload.updatedBy = uid;
-          payload.updatedAt = serverTime();
-          if (!payload.createdBy) payload.createdBy = uid;
-          if (!payload.createdAt) payload.createdAt = serverTime();
-          batch.set(ref, payload, { merge: mode === 'merge' });
+      return chunks.reduce(function (chain, chunk) {
+        return chain.then(function () {
+          var batch = db.batch();
+          chunk.forEach(function (p) {
+            var ref = p.id ? propertiesRef().doc(p.id) : propertiesRef().doc();
+            var payload = Object.assign({}, p);
+            delete payload.id;
+            payload.updatedBy = uid;
+            payload.updatedAt = serverTime();
+
+            if (p.id && existing[p.id]) {
+              // 既にある物件。追加者は元のままにし、★も今の値を残す。
+              // 書き出した時点の★より、いま入っている値のほうが新しい。
+              delete payload.createdBy;
+              delete payload.createdAt;
+              delete payload.ratings;
+              batch.set(ref, payload, { merge: true });
+            } else {
+              payload.createdBy = uid;
+              if (!payload.createdAt) payload.createdAt = serverTime();
+              batch.set(ref, payload);
+            }
+          });
+          return batch.commit();
         });
-        return batch.commit();
-      });
-    }, startedAt);
+      }, startedAt);
+    });
   }
 
   Chintai.db = {
