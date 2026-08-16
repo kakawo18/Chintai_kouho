@@ -47,6 +47,7 @@
       body: JSON.stringify(body)
     }).then(function (res) {
       if (res.status === 401) throw new Error('合言葉が違います。設定を見直してください');
+      if (res.status === 429) throw new Error('短い時間に何度も読み取りました。1分ほど置いてからお試しください');
       if (!res.ok) throw new Error('中継サーバーに接続できませんでした (' + res.status + ')');
       return res.json();
     }).then(function (data) {
@@ -73,6 +74,11 @@
         // 番号だけでは何も分からないので、中継サーバーが掴んだ理由をそのまま出す
         return '抽出に失敗しました（' + (status || '') + '）。' +
           (detail ? '［' + detail + '］' : 'もう一度お試しください。');
+      case 'bad_url':
+        return 'このURLは読み取れません（https:// のページだけを取りに行きます）。' +
+          'ページの文字をコピーして貼ってください。';
+      case 'rate_limited':
+        return '短い時間に何度も読み取りました。1分ほど置いてからお試しください。';
       case 'server_not_configured':
         return '中継サーバーの設定が未完了です（APIキーか合言葉が未登録）。';
       default:

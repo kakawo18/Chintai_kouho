@@ -36,6 +36,11 @@ const DEFAULT_MAX_TOKENS = 16000;
 const MAX_PAGE_CHARS = 60000;
 const MAX_PASTED_CHARS = 60000;
 
+// ページ取得の上限。相手のサーバーに待たされ続けたり、
+// 転送でたらい回しにされたりしないようにする。
+const FETCH_TIMEOUT_MS = 10000;
+const MAX_REDIRECTS = 3;
+
 // 抽出結果の形。アプリのフォームの項目とそのまま対応させてある。
 const PROPERTY_SCHEMA = {
   type: 'object',
@@ -89,32 +94,126 @@ function json(body, status, env) {
   });
 }
 
-// 合言葉の比較で、一致した文字数から答えを絞り込まれないよう長さに依らない比較にする
-function safeEqual(a, b) {
+// 合言葉の比較。
+// 先にハッシュを取ってから比べる。こうすると比べる長さが常に32バイトで揃うため、
+// 「何文字目まで合っていたか」も「合言葉が何文字か」も応答時間から読み取れない。
+async function safeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  if (a.length !== b.length) return false;
+
+  const enc = new TextEncoder();
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b))
+  ]);
+
+  const x = new Uint8Array(ha);
+  const y = new Uint8Array(hb);
   let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
   return diff === 0;
 }
 
-// ページ本文の抽出。script/style を捨てて本文テキストだけを拾う。
-async function fetchPageText(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-                    '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-      'Accept-Language': 'ja,en;q=0.8'
-    },
-    redirect: 'follow'
-  });
+// 同じ相手からの連打を止める。合言葉の総当たりと、通ったあとの使い過ぎの両方に効く。
+// 上限は wrangler.toml の [[unsafe.bindings]] で決める（既定は1分あたり15回）。
+//
+// バインディングが無い場合は通す。ここで閉じると、設定を入れ忘れただけで
+// 自動入力が全く動かなくなり、原因も分かりにくい。合言葉は依然として必要なので、
+// その場合の守りは以前と同じ強さに戻るだけになる。
+async function withinRateLimit(request, env) {
+  if (!env.RATE_LIMITER || typeof env.RATE_LIMITER.limit !== 'function') {
+    console.warn('RATE_LIMITER が未設定です。回数制限なしで動いています');
+    return true;
+  }
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const { success } = await env.RATE_LIMITER.limit({ key: ip });
+  return success;
+}
 
-  if (!res.ok) {
-    return { ok: false, status: res.status };
+// 取りに行ってよい宛先か。
+//
+// Workers からプライベートIPには基本的に届かないが、それに寄りかからず自分で塞ぐ。
+// ここを通す条件は「https で、名前がプライベート側を指していないこと」。
+// リダイレクトのたびに毎回この判定を通す（最初のURLだけ見ても、
+// 転送先で内側に入られたら意味がないため）。
+const BLOCKED_HOSTS = /^(localhost|.*\.local|.*\.internal|.*\.home\.arpa)$/i;
+
+function allowedTarget(url) {
+  let target;
+  try {
+    target = new URL(url);
+  } catch (e) {
+    return null;
   }
 
+  // http を通す理由が無い。物件サイトはどこも https で配信している。
+  if (target.protocol !== 'https:') return null;
+
+  const host = target.hostname.replace(/^\[|\]$/g, '');
+  if (BLOCKED_HOSTS.test(host)) return null;
+
+  // IPv4 のプライベート・ループバック・リンクローカル
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    const p = host.split('.').map(Number);
+    if (p[0] === 127 || p[0] === 10 || p[0] === 0) return null;
+    if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return null;
+    if (p[0] === 192 && p[1] === 168) return null;
+    if (p[0] === 169 && p[1] === 254) return null;   // クラウドのメタデータ
+    if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return null;
+  }
+
+  // IPv6 のループバック・ユニークローカル・リンクローカル
+  if (host === '::1' || /^f[cd][0-9a-f]{2}:/i.test(host) || /^fe80:/i.test(host)) return null;
+
+  return target;
+}
+
+// ページ本文の抽出。script/style を捨てて本文テキストだけを拾う。
+//
+// 相手のサーバーに主導権を渡さないよう、3つの上限を掛けている。
+//   ・時間  … 応答を返さないサーバーに待たされ続けない
+//   ・転送数… 転送で延々とたらい回しにされない
+//   ・文字数… 巨大なページでメモリを使い切らない
+async function fetchPageText(url) {
+  let current = url;
+  let res = null;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const target = allowedTarget(current);
+    if (!target) return { ok: false, status: 0, reason: 'blocked' };
+
+    res = await fetch(target.toString(), {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+                      '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept-Language': 'ja,en;q=0.8'
+      },
+      // 自分で追う。転送先が内側を指していないかを毎回確かめるため。
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    });
+
+    if (res.status < 300 || res.status > 399) break;
+
+    const next = res.headers.get('Location');
+    if (!next) break;
+    current = new URL(next, target).toString();
+    res = null;
+  }
+
+  if (!res) return { ok: false, status: 0, reason: 'too_many_redirects' };
+  if (!res.ok) return { ok: false, status: res.status };
+
   const chunks = [];
+  let total = 0;
   let dropping = false;
+
+  // 上限に達したら以降は捨てる。全部ためてから切り詰めると、
+  // 切り詰める前にメモリが尽きる。
+  function push(s) {
+    if (total >= MAX_PAGE_CHARS) return;
+    chunks.push(s);
+    total += s.length;
+  }
 
   const rewriter = new HTMLRewriter()
     .on('script, style, noscript', {
@@ -126,14 +225,14 @@ async function fetchPageText(url) {
     .on('img', {
       element(el) {
         const src = el.getAttribute('src') || el.getAttribute('data-src');
-        if (src) chunks.push('\n[画像] ' + src + '\n');
+        if (src) push('\n[画像] ' + src + '\n');
       }
     })
     .on('*', {
       text(t) {
         if (dropping) return;
         const s = t.text.replace(/\s+/g, ' ');
-        if (s.trim()) chunks.push(s);
+        if (s.trim()) push(s);
       }
     });
 
@@ -279,6 +378,10 @@ function stripToJson(text) {
   return s;
 }
 
+// テストから直接呼ぶために出しておく（test/worker.fetch.test.mjs）。
+// Workers は default export だけを見るので、これがあっても動きは変わらない。
+export { allowedTarget, fetchPageText };
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -290,6 +393,15 @@ export default {
     if (!env.KIMI_API_KEY || !env.APP_PASSPHRASE) {
       return json({ error: 'server_not_configured' }, 500, env);
     }
+    if (env.APP_PASSPHRASE.length < 12) {
+      // 止めはしない（動いているものを設定だけで落とさない）。気づけるように残す。
+      console.warn('APP_PASSPHRASE が12文字未満です。総当たりに耐えられません');
+    }
+
+    // 合言葉を見る前に数える。外れた回数も上限に含めないと総当たりを止められない。
+    if (!(await withinRateLimit(request, env))) {
+      return json({ error: 'rate_limited' }, 429, env);
+    }
 
     let payload;
     try {
@@ -298,25 +410,26 @@ export default {
       return json({ error: 'bad_request' }, 400, env);
     }
 
-    if (!safeEqual(payload.passphrase || '', env.APP_PASSPHRASE)) {
+    if (!(await safeEqual(payload.passphrase || '', env.APP_PASSPHRASE))) {
       return json({ error: 'unauthorized' }, 401, env);
     }
 
     let sourceText = '';
 
     if (payload.url) {
-      let target;
-      try {
-        target = new URL(payload.url);
-      } catch (e) {
-        return json({ error: 'bad_url' }, 400, env);
-      }
-      // 社内ネットワークや別プロトコルへ踏み台にされないよう http(s) だけ通す
-      if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+      // 取りに行ってよい宛先かを、投げる前に確かめる（詳細は allowedTarget）
+      const target = allowedTarget(payload.url);
+      if (!target) {
         return json({ error: 'bad_url' }, 400, env);
       }
 
-      const page = await fetchPageText(target.toString());
+      let page;
+      try {
+        page = await fetchPageText(target.toString());
+      } catch (e) {
+        // 時間切れや接続できないページ。異常系ではなく通常の分岐として返す。
+        return json({ error: 'fetch_failed', status: 0 }, 200, env);
+      }
       if (!page.ok) {
         return json({ error: 'fetch_failed', status: page.status }, 200, env);
       }

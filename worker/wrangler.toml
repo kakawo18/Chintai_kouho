@@ -2,6 +2,15 @@ name = "chintai-kouho-extract"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
+# 同じ相手（IP）からのリクエスト回数の上限。合言葉の総当たりを止めるために要ります。
+# 自動入力は1件登録するごとに1回なので、1分15回で普通の使い方には当たりません。
+# namespace_id はこの Worker の中で通し番号を振るだけの値で、どこかに登録する必要はありません。
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 15, period = 60 }
+
 # 許可するアプリの配信元。GitHub Pages の URL に合わせて書き換えてください。
 # 手元で試すときは http://localhost:8000 を一時的に指定します。
 [vars]
