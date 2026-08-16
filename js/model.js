@@ -124,7 +124,9 @@
       walkMin: num(d.walkMin),
       commuteMin: num(d.commuteMin),
       commuteNote: str(d.commuteNote),
-      imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls.filter(function (u) { return !!str(u); }) : [],
+      // http(s) だけを残す。手入力とJSONの読み込みには検証が無いため、
+      // ここで通しておかないと自動入力の経路にしか効かない。
+      imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls.filter(isHttpUrl) : [],
       url: str(d.url),
       memo: str(d.memo),
       ratings: (d.ratings && typeof d.ratings === 'object') ? d.ratings : {},

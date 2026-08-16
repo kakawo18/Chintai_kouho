@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2f6fd0">
+
+<!-- 万一どこかに script を差し込まれても、外へ持ち出せないようにするための保険。
+     GitHub Pages はレスポンスヘッダを設定できないため meta で入れている。
+     connect-src の *.workers.dev は自動入力の中継サーバー。独自ドメインで
+     立てている場合は、そのドメインをここに足さないと自動入力が通らない。
+     style-src に unsafe-inline が要るのは、Leaflet が要素に直接 style を書くため。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://nominatim.openstreetmap.org https://*.workers.dev; manifest-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'">
 <title>物件メモ</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png">

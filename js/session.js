@@ -81,6 +81,10 @@
   }
 
   // 自動入力の接続先と合言葉。端末内にだけ置き、共有データには載せない。
+  //
+  // 平文で置いている。localStorage である以上、同じオリジンで動くスクリプトからは
+  // どう置いても読めるため、暗号化しても守りは増えない（鍵も同じ場所に要る）。
+  // 実際の守りは「そのスクリプトを差し込ませないこと」＝ URL の scheme 検証と CSP のほう。
   function getExtractConfig() {
     try {
       return JSON.parse(safeGet(EXTRACT_KEY) || '{}');

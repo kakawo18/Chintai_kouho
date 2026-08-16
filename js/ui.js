@@ -278,10 +278,11 @@
     var initial = M.initialCost(p);
     var age = M.buildingAge(p);
 
+    // 出せなかったときの差し替えは、描画したあとに付ける（wireImageFallbacks）。
+    // onerror を属性に書くと CSP でインラインを許すことになり、CSP を入れる意味が薄れる。
     var images = p.imageUrls.length
       ? '<div class="detail__images">' + p.imageUrls.map(function (u) {
-          return '<img src="' + escapeHtml(u) + '" alt="" loading="lazy" ' +
-            'onerror="this.outerHTML=\'<div class=&quot;img-fallback&quot;>画像を表示できません</div>\'">';
+          return '<img src="' + escapeHtml(u) + '" alt="" loading="lazy">';
         }).join('') + '</div>'
       : '';
 
@@ -356,6 +357,8 @@
         '</div>' +
       '</div>';
 
+    wireImageFallbacks();
+
     renderRatingInput($('detail-rating'), M.ratingOf(p, ctx.uid), function (v) {
       handlers.onRate(p.id, v);
     });
@@ -387,6 +390,20 @@
     if (detailUnsub) detailUnsub();
     detailUnsub = handlers.onWatchComments(p.id, function (comments) {
       renderComments(comments, ctx);
+    });
+  }
+
+  // 物件サイトの画像は、直リンクを拒む設定になっていることがある。
+  // 壊れた画像のまま置くと理由が分からないので、その場で文言に差し替える。
+  function wireImageFallbacks() {
+    var imgs = els.detailView.querySelectorAll('.detail__images img');
+    Array.prototype.forEach.call(imgs, function (img) {
+      img.addEventListener('error', function () {
+        var box = document.createElement('div');
+        box.className = 'img-fallback';
+        box.textContent = '画像を表示できません';
+        if (img.parentNode) img.parentNode.replaceChild(box, img);
+      });
     });
   }
 
